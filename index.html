@@ -437,8 +437,8 @@ body.transitioning *{
 <div id="stage">
   <div id="stage-backdrop"></div>
   <video id="active" playsinline muted preload="auto"></video>
-  <video id="next" playsinline muted preload="metadata"></video>
-  <video id="buffer" playsinline muted preload="metadata"></video>
+  <video id="next" playsinline muted preload="auto"></video>
+  <video id="buffer" playsinline muted preload="auto"></video>
   <div class="stage-overlay" aria-hidden="true"></div>
   <div id="xfadeGuard" aria-hidden="true"></div>
   <div id="panel">
@@ -1210,7 +1210,11 @@ function playTransition(viaFile, destLoop, destId){
     next.addEventListener('playing',onProgress);
     next.addEventListener('canplay',onProgress);
     next.addEventListener('canplaythrough',onProgress); // Better for Pi
-    try{ await next.play(); }catch(e){ console.warn('[CC] next.play fail',e,'-> instant fallback'); finalize('play-fail'); return; }
+    // Ensure we have actual decoded frame data before play to avoid white flashes
+    try{
+      await new Promise(res=>{ if(next.readyState>=2) return res(); next.addEventListener('loadeddata', res, {once:true}); next.addEventListener('error', res, {once:true}); });
+      await next.play();
+    }catch(e){ console.warn('[CC] next.play fail',e,'-> instant fallback'); finalize('play-fail'); return; }
     // Enhanced: Wait for better readiness indicators before showing overlay
     if((next.readyState >= 4 || next.currentTime > 0.1) && next.videoWidth > 0) {
       showFirstFrame();
