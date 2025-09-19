@@ -5,6 +5,7 @@
 <title>Convention Center Navigator</title>
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <style>
+html,body{background:#000;color:#e7eef8;}
 :root{ --banner-h: 22vh; --panel-w: clamp(280px, 28vw, 420px); --nav-clearance-gap: 120; 
   --accent:#3b82f6; /* primary blue */
   --accent-alt:#1d4ed8; /* deeper edge */
@@ -302,6 +303,7 @@ video {
   /* Ensure smooth playback */
   -webkit-filter: blur(0);
   filter: blur(0);
+  background:#000; /* ensure no white flash when src/poster swap */
 }
 
 /* Ensure black background is always visible during transitions */
@@ -315,6 +317,7 @@ video {
   background: #000;
   z-index: -2;
 }
+.stage-overlay{background:linear-gradient(90deg, rgba(6,10,18,.68) 0%, rgba(6,10,18,.42) 18%, rgba(6,10,18,.18) 32%, rgba(6,10,18,0) 48%), #000;}
 
 /* Hide fullscreen button */
 #btnFullscreen {
@@ -733,6 +736,8 @@ async function init(){
   disableUI(true);
   const params=new URLSearchParams(location.search);
   const skip=params.has('skipPreload');
+  // Show overlay as early as possible to avoid white flashes
+  showPreloadOverlay(true);
   if(!skip){
     try{ await preloadAllVideos(); }catch(e){ console.warn('[CC][PRELOAD] failed', e); }
   }
@@ -742,6 +747,7 @@ async function init(){
   disableUI(false);
   status('Ready');
   updateMobileContain();
+  showPreloadOverlay(false);
 }
 
 function setState(s){
@@ -1811,6 +1817,44 @@ async function loadEvents(){
     const data = await resp.json();
     if(Array.isArray(data)) EVENTS = data.filter(Boolean);
     else if(Array.isArray(data.events)) EVENTS = data.events.filter(Boolean);
+    // For each event, if hero path is inside a folder, load info.txt from that same folder
+    for(let i=0;i<EVENTS.length;i++){
+      const ev = EVENTS[i] || {};
+      const hero = ev.hero || '';
+      // Derive folder from hero like "Events/Foo Bar/image.avif"
+      let folder = '';
+      if(typeof hero === 'string'){
+        const parts = hero.split('/');
+        if(parts.length >= 3){
+          folder = parts.slice(0, parts.length-1).join('/');
+        }
+      }
+      if(folder){
+        const infoUrl = folder + '/info.txt';
+        try{
+          const r = await fetch(infoUrl, { cache: 'no-cache' });
+          if(r.ok){
+            const txt = await r.text();
+            // Very light parsing: first non-empty line is title, next non-empty line with date/time becomes hours, remaining as desc
+            const lines = txt.split(/\r?\n/).map(s=>s.trim());
+            const nonEmpty = lines.filter(s=>s.length>0);
+            if(!ev.title && nonEmpty[0]) ev.title = nonEmpty[0];
+            // Heuristic: find a line that looks like a date/time range for hours
+            if(!ev.hours){
+              const hrs = nonEmpty.find(s=>/(AM|PM|\d{1,2}:\d{2}|\d{1,2}\s*(AM|PM))/i.test(s));
+              if(hrs) ev.hours = hrs;
+            }
+            // Description: join the last few lines if not provided
+            if(!ev.desc && nonEmpty.length){
+              ev.desc = nonEmpty.slice(2, 8).join(' ');
+            }
+            // Location tag default if missing
+            if(!ev.tag) ev.tag = 'Convention Center';
+          }
+        }catch(e){ console.warn('[Events] info.txt load failed for', folder, e); }
+      }
+      EVENTS[i] = ev;
+    }
   }catch(e){
     console.warn('[Events] Failed to load events:', e);
     EVENTS = [];
