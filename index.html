@@ -5,7 +5,6 @@
 <title>Convention Center Navigator</title>
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <style>
-html,body{background:#000 !important;color:#e7eef8;}
 :root{ --banner-h: 22vh; --panel-w: clamp(280px, 28vw, 420px); --nav-clearance-gap: 120; 
   --accent:#3b82f6; /* primary blue */
   --accent-alt:#1d4ed8; /* deeper edge */
@@ -23,7 +22,7 @@ video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;backgrou
 #active{z-index:1;}
 #next{z-index:2;}
 #buffer{z-index:0;}
-#next,#buffer{opacity:0;pointer-events:none;background:#000;}
+#next,#buffer{opacity:0;pointer-events:none;}
 .fade-in{animation:fade .4s ease forwards;}
 @keyframes fade{from{opacity:0}to{opacity:1}}
 /* Left-to-right dark gradient overlay for better left-side readability */
@@ -303,7 +302,6 @@ video {
   /* Ensure smooth playback */
   -webkit-filter: blur(0);
   filter: blur(0);
-  background:#000; /* ensure no white flash when src/poster swap */
 }
 
 /* Ensure black background is always visible during transitions */
@@ -317,7 +315,6 @@ video {
   background: #000;
   z-index: -2;
 }
-.stage-overlay{background:linear-gradient(90deg, rgba(6,10,18,.68) 0%, rgba(6,10,18,.42) 18%, rgba(6,10,18,.18) 32%, rgba(6,10,18,0) 48%), #000;}
 
 /* Hide fullscreen button */
 #btnFullscreen {
@@ -363,32 +360,13 @@ video {
 .tool-btn:hover{background:rgba(12,16,24,.72);}
 .tool-btn:active{transform:translateY(1px);} 
 .tool-btn:focus{outline:2px solid rgba(245,158,11,.6);} 
-
-/* ---------- Startup preloader overlay ---------- */
-#preloadOverlay{position:fixed;inset:0;background:#000;z-index:2147483000;display:none;align-items:center;justify-content:center;color:#fff;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;}
-#preloadOverlay.show{display:flex;}
-#preloadBox{display:flex;flex-direction:column;gap:16px;align-items:center;max-width:min(86vw, 720px);text-align:center;padding:24px 28px;border-radius:12px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);box-shadow:0 12px 32px -18px rgba(0,0,0,.7), inset 0 0 0 1px rgba(255,255,255,.03);} 
-#preloadTitle{font-size:1rem;font-weight:700;color:#e9eef8;letter-spacing:.2px;}
-#preloadProgress{width:min(72vw, 560px);height:8px;background:rgba(255,255,255,.08);border-radius:999px;overflow:hidden;}
-#preloadBar{height:100%;width:0;background:linear-gradient(90deg,#60a5fa,#34d399);transition:width .25s ease;}
-#preloadText{font-size:.9rem;color:#cdd6e3;}
-#preloadSkipBtn{display:none;margin-top:2px;background:#1c2433;color:#e5efff;border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:.45rem .8rem;font-weight:700;letter-spacing:.2px;cursor:pointer;}
-#preloadSkipBtn:hover{filter:brightness(1.05);} 
 </style>
 </head>
 <body>
-<div id="preloadOverlay" aria-live="polite" aria-label="Loading videos">
-  <div id="preloadBox">
-    <div id="preloadTitle">Preparing media…</div>
-    <div id="preloadProgress"><div id="preloadBar"></div></div>
-    <div id="preloadText">Initializing…</div>
-    <button id="preloadSkipBtn" type="button" aria-label="Skip preloading">Start now</button>
-  </div>
-</div>
 <header>Convention Center Navigator <span class="badge">Beta</span></header>
 <div id="stage">
   <div id="stage-backdrop"></div>
-  <video id="active" playsinline muted preload="auto" autoplay></video>
+  <video id="active" playsinline muted preload="auto"></video>
   <video id="next" playsinline muted preload="metadata"></video>
   <video id="buffer" playsinline muted preload="metadata"></video>
   <div class="stage-overlay" aria-hidden="true"></div>
@@ -734,21 +712,12 @@ init();
 
 async function init(){
   disableUI(true);
-  const params=new URLSearchParams(location.search);
-  const skip=params.has('skipPreload');
-  // Show overlay as early as possible to avoid white flashes
-  showPreloadOverlay(true);
-  if(!skip){
-    try{ await preloadAllVideos(); }catch(e){ console.warn('[CC][PRELOAD] failed', e); }
-  }
   await loadLoop(states[current].loop);
-  await ensurePlayback(active, 'init');
+  try { await active.play(); } catch(e) {}
   setState(current);
   disableUI(false);
   status('Ready');
   updateMobileContain();
-  await waitFirstFrame(active, 4000);
-  showPreloadOverlay(false);
 }
 
 function setState(s){
@@ -782,74 +751,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
   if(fsBtn) fsBtn.addEventListener('click', toggleFS);
   if(resetCtl) resetCtl.addEventListener('click', doReset);
 });
-
-// ------------------------ Full preloader (all videos) ------------------------
-function showPreloadOverlay(show){
-  const ov=document.getElementById('preloadOverlay'); if(!ov) return;
-  ov.classList.toggle('show', !!show);
-}
-function updatePreloadProgress(done,total,label){
-  const bar=document.getElementById('preloadBar');
-  const text=document.getElementById('preloadText');
-  const pct = total? Math.round((done/total)*100):0;
-  if(bar) bar.style.width = pct + '%';
-  if(text) text.textContent = (label||'Loading') + ' • ' + pct + '%';
-}
-
-async function preloadAllVideos(){
-  // Collect all loop base names and transitions
-  const loopNames = Array.from(new Set(Object.values(states).map(s=>s.loop).filter(Boolean)));
-  // Resolve loop variants (e.g., _high/_med/_low) except intro
-  const resolvedLoops = await Promise.all(loopNames.map(n=>resolveLoopFilename(n)));
-  const transitionNames = [];
-  Object.values(states).forEach(s=>{ if(s.transitions){ Object.values(s.transitions).forEach(t=>{ if(t) transitionNames.push(t); }); } });
-  const allClips = Array.from(new Set([...resolvedLoops, ...transitionNames]));
-  const posters = resolvedLoops.map(posterFor);
-
-  const total = allClips.length + posters.length;
-  let done = 0;
-  showPreloadOverlay(true);
-  updatePreloadProgress(0,total,'Preparing');
-  let skip=false; const skipBtn=document.getElementById('preloadSkipBtn'); if(skipBtn){
-    const showTimer=setTimeout(()=>{ skipBtn.style.display='inline-flex'; }, 2500);
-    const onSkip=()=>{ skip=true; skipBtn.removeEventListener('click', onSkip); };
-    skipBtn.addEventListener('click', onSkip);
-  }
-
-  // Helper to load a single video to canplaythrough/currentTime>0
-  async function loadVideo(src){
-    return new Promise((resolve)=>{
-      const v=document.createElement('video');
-      v.preload='auto'; v.muted=true; v.playsInline=true;
-      const cleanup=()=>{ v.removeAttribute('src'); v.load(); };
-      const finish=()=>{ cleanup(); resolve(); };
-      let timer=setTimeout(finish, 14000); // generous per-clip timeout for Pi
-      v.addEventListener('canplaythrough',()=>{ clearTimeout(timer); finish(); },{once:true});
-      v.addEventListener('error',()=>{ clearTimeout(timer); finish(); },{once:true});
-      v.src = base + src;
-      // Kick decode path; ignore failures
-      v.play().then(()=>{ try{ v.pause(); }catch{} }).catch(()=>{});
-    });
-  }
-  async function loadImage(url){
-    return new Promise((resolve)=>{ const i=new Image(); i.onload=resolve; i.onerror=resolve; i.src=url; });
-  }
-
-  // Sequential to avoid hammering Pi I/O; update progress per item
-  for(const clip of allClips){
-    if(skip) break;
-    try{ await loadVideo(clip); }finally{ done++; updatePreloadProgress(done,total,'Caching video'); }
-  }
-  for(const p of posters){
-    if(skip) break;
-    try{ await loadImage(p); }finally{ done++; updatePreloadProgress(done,total,'Caching posters'); }
-  }
-  // Add <link rel=preload> hints so browser can reuse cache pipeline
-  allClips.forEach(c=>{ const l=document.createElement('link'); l.rel='preload'; l.as='video'; l.href=base+c; document.head.appendChild(l); });
-  posters.forEach(p=>{ const l=document.createElement('link'); l.rel='preload'; l.as='image'; l.href=p; document.head.appendChild(l); });
-
-  showPreloadOverlay(false);
-}
 
 // Inline SVG line icons (placeholder set) – replace with production emblems later
 const ICONS = {
@@ -925,7 +826,7 @@ function updateNavActive(){
       const parentKey = current==='convention_floor' ? 'convention' : 'expo';
       const parentBtn = ui.querySelector(`.btn[data-dest="${parentKey}"]`);
       if(parentBtn) parentBtn.insertAdjacentElement('afterend', exitBtn); else ui.prepend(exitBtn);
-      exitBtn.addEventListener('click', exitFloorNow);
+      exitBtn.addEventListener('click', ()=>{ if(current==='convention_floor') go('convention'); else if(current==='expo_floor') go('expo'); });
     }
     // During floor, force selectedNav to synthetic exit
     selectedNav='__exit_floor';
@@ -1077,7 +978,6 @@ async function instantSwitch(dest){
   tmp.style.objectFit='cover'; tmp.style.opacity='0'; tmp.style.zIndex='4'; tmp.style.background='#000';
   tmp.className = 'crossfade-temp';
   tmp.src = base + resolved;
-  try{ tmp.removeAttribute('poster'); }catch{}
   applyPoster(tmp, resolved);
   document.getElementById('stage').appendChild(tmp);
   
@@ -1117,9 +1017,8 @@ async function instantSwitch(dest){
     try {
       active.src = tmp.src;
       active.loop = true;
-      try{ active.removeAttribute('poster'); }catch{}
       await waitReady(active);
-      await ensurePlayback(active, 'instantSwitch');
+      try { await active.play(); } catch(e) {}
     } catch(e){ console.warn('[CC] instantSwitch play issue', e); }
     try { document.getElementById('stage').removeChild(tmp); } catch(e) {}
     current = dest;
@@ -1142,7 +1041,6 @@ function playTransition(viaFile, destLoop, destId){
     next.style.transition='none';
     next.style.opacity='0';
     next.src=base+viaFile; next.loop=false;
-    try{ next.removeAttribute('poster'); }catch{}
     next.addEventListener('error',()=>{ console.warn('[CC][TRANS] video error', viaFile,'falling back'); });
     next.addEventListener('loadedmetadata',()=>console.log('[CC][TRANS] loadedmetadata', viaFile,'dur=',next.duration));
     next.addEventListener('loadeddata',()=>console.log('[CC][TRANS] loadeddata', viaFile));
@@ -1174,7 +1072,7 @@ function playTransition(viaFile, destLoop, destId){
         const resolvedDest = await resolveLoopFilename(destLoop);
         buffer.src=base+resolvedDest; buffer.loop=true; applyPoster(buffer,resolvedDest);
       }
-  try { active.src = buffer.src; active.loop = true; try{ active.removeAttribute('poster'); }catch{} await waitReady(active,'finalizeLoop'); await ensurePlayback(active,'finalizeLoop'); } catch(e){ console.warn('[CC] loop swap issue', e); }
+      try { active.src = buffer.src; active.loop = true; applyPoster(active, destLoop); await waitReady(active,'finalizeLoop'); try{ await active.play(); }catch(e){} } catch(e){ console.warn('[CC] loop swap issue', e); }
       next.style.transition='opacity .35s ease';
       requestAnimationFrame(()=>{ next.style.opacity='0'; });
       setTimeout(()=>{ try{ next.pause(); next.removeAttribute('src'); next.load(); }catch(e){} persistState(destId); resolve(); },380);
@@ -1247,8 +1145,7 @@ async function loadLoop(file){
   const resolved = await resolveLoopFilename(file);
   active.src = base + resolved;
   active.loop = true;
-  // Temporarily avoid poster image to prevent white; rely on black background until frame ready
-  try{ active.removeAttribute('poster'); }catch{}
+  applyPoster(active, resolved);
   await waitReady(active, 'loadLoop:'+resolved);
   try {
     await active.play();
@@ -1322,31 +1219,6 @@ window.addEventListener('resize',()=>{
 function disableUI(flag){
   Array.from(ui.querySelectorAll('button')).forEach(b=>b.disabled=flag);
   status(flag?'Busy...':'Ready');
-}
-
-// Attempt to start and sustain playback briefly
-async function ensurePlayback(videoEl, label){
-  try{ videoEl.muted = true; }catch{}
-  let attempts = 0;
-  const maxAttempts = 10; // ~3s total
-  while(attempts++ < maxAttempts){
-    try{ await videoEl.play(); }catch{}
-    if(!videoEl.paused || videoEl.currentTime > 0.05) break;
-    await new Promise(r=>setTimeout(r,300));
-  }
-}
-
-// Wait for a real first frame on screen
-async function waitFirstFrame(videoEl, timeoutMs){
-  const start = performance.now();
-  return new Promise(resolve=>{
-    const check=()=>{
-      const ok = (videoEl.readyState>=2 && videoEl.currentTime>0.05 && videoEl.videoWidth>0);
-      if(ok || (performance.now()-start)>timeoutMs){ return resolve(); }
-      requestAnimationFrame(check);
-    };
-    check();
-  });
 }
 
 function status(msg){ statusEl.textContent = msg; }
@@ -1684,7 +1556,9 @@ document.addEventListener('click',(e)=>{
       console.log('[FLOOR] nextLayout click');
       setFloorIdx(floorIdx+1); break;
     case 'exitFloor':
-      exitFloorNow();
+      console.log('[FLOOR] exitFloor click from', current);
+      if(current==='convention_floor') go('convention');
+      else if(current==='expo_floor') go('expo');
       break;
   }
   if(typeof syncBannerHeight==='function') syncBannerHeight();
@@ -1697,17 +1571,6 @@ function syncMenuVisibilityForFloor(){
   if(!ui) return;
   // Floor mode visibility handled by updateFloorUIVisibility. Keep defaults here.
   ui.style.display = '';
-}
-
-// Centralized floor exit handler to avoid duplicate logic
-function exitFloorNow(){
-  console.log('[FLOOR] exitFloor click from', current, 'isTransitioning=', isTransitioning);
-  if(isTransitioning){
-    // If a transition is running, abort and go straight to parent state
-    try{ if(currentTransitionAbort) currentTransitionAbort('floor-exit'); }catch{}
-  }
-  if(current==='convention_floor') go('convention');
-  else if(current==='expo_floor') go('expo');
 }
 
 // Reset button logic
@@ -1840,104 +1703,13 @@ let EVENTS = [];
 let eventIdx = 0;
 let eventTimer = null;
 
-// --- Directory listing helpers (for autoscan) ---
-function isDirHref(href){ return /\/$/.test(href) && href !== '../'; }
-function fileExt(name){ const m = name.toLowerCase().match(/\.([a-z0-9]+)$/); return m? m[1] : ''; }
-function decodeName(href){ try{ return decodeURIComponent(href.replace(/\/$/,'')); }catch{ return href.replace(/\/$/,''); } }
-function encodePath(parts){ return parts.map(p=>encodeURIComponent(p)).join('/') + '/'; }
-function encodeFile(parts, file){ return parts.map(p=>encodeURIComponent(p)).join('/') + '/' + encodeURIComponent(file); }
-function pickHeroFile(files){
-  const prio = ['avif','webp','jpg','jpeg','png'];
-  for(const ext of prio){ const f = files.find(n=>fileExt(n)===ext); if(f) return f; }
-  return files[0] || null;
-}
-async function listDir(path){
-  try{
-    const resp = await fetch(path, { cache:'no-cache' });
-    if(!resp.ok) throw new Error('HTTP '+resp.status);
-    const ct = resp.headers.get('content-type')||'';
-    if(!ct.includes('text/html')) throw new Error('no listing');
-    const html = await resp.text();
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(html, 'text/html');
-    const anchors = Array.from(doc.querySelectorAll('a[href]')).map(a=>a.getAttribute('href'));
-    // Normalize, skip parents and querystrings
-    const dirs = anchors.filter(h=>isDirHref(h)).map(decodeName);
-    const files = anchors.filter(h=>!isDirHref(h) && !h.includes('?') && !h.startsWith('#')).map(h=>decodeName(h));
-    return { dirs, files };
-  }catch(e){ return { dirs:[], files:[], error:e }; }
-}
-
-async function autoscanEvents(){
-  const baseParts = ['Events'];
-  const top = await listDir(encodePath(baseParts));
-  if(!top.dirs.length) return [];
-  const out = [];
-  for(const dir of top.dirs){
-    const folderParts = [...baseParts, dir];
-    const listing = await listDir(encodePath(folderParts));
-    // Pick hero image
-    const heroFile = pickHeroFile(listing.files);
-    const hero = heroFile ? encodeFile(folderParts, heroFile) : '';
-    // Load info.txt from same folder (use decoded name for display)
-    let title=''; let hours=''; let desc=''; let tag='';
-    try{
-      const infoResp = await fetch(encodeFile(folderParts, 'info.txt'), { cache:'no-cache' });
-      if(infoResp.ok){
-        const txt = await infoResp.text();
-        const lines = txt.split(/\r?\n/).map(s=>s.trim());
-        const nonEmpty = lines.filter(Boolean);
-        title = nonEmpty[0] || dir;
-        const hoursLine = nonEmpty.find(s=>/(AM|PM|\d{1,2}:\d{2}|\d{1,2}\s*(AM|PM))/i.test(s));
-        if(hoursLine) hours = hoursLine;
-        desc = nonEmpty.slice(2, 8).join(' ');
-        tag = 'Convention Center';
-      }
-    }catch{}
-    out.push({ title: title||dir, tag: tag||'Convention Center', desc, hours, hero, distance:'', spot:'' });
-  }
-  return out;
-}
-
 async function loadEvents(){
   try{
-    // First try autoscan (requires directory listings enabled on server)
-    const auto = await autoscanEvents();
-    if(auto.length){
-      EVENTS = auto;
-    } else {
-      // Fallback to optional index.json if listings are disabled
-      const resp = await fetch('Events/index.json', { cache: 'no-cache' });
-      if(!resp.ok) throw new Error('events index.json not found');
-      const data = await resp.json();
-      if(Array.isArray(data)) EVENTS = data.filter(Boolean);
-      else if(Array.isArray(data.events)) EVENTS = data.events.filter(Boolean);
-      // Ensure folder cohesion: enrich from folder info.txt if possible
-      for(let i=0;i<EVENTS.length;i++){
-        const ev = EVENTS[i] || {};
-        const hero = ev.hero || '';
-        let folder = '';
-        if(typeof hero === 'string'){
-          const parts = hero.split('/');
-          if(parts.length >= 3){ folder = parts.slice(0, parts.length-1).join('/'); }
-        }
-        if(folder){
-          try{
-            const r = await fetch(folder + '/info.txt', { cache:'no-cache' });
-            if(r.ok){
-              const txt = await r.text();
-              const lines = txt.split(/\r?\n/).map(s=>s.trim());
-              const nonEmpty = lines.filter(Boolean);
-              if(!ev.title && nonEmpty[0]) ev.title = nonEmpty[0];
-              if(!ev.hours){ const hrs = nonEmpty.find(s=>/(AM|PM|\d{1,2}:\d{2}|\d{1,2}\s*(AM|PM))/i.test(s)); if(hrs) ev.hours = hrs; }
-              if(!ev.desc && nonEmpty.length){ ev.desc = nonEmpty.slice(2,8).join(' '); }
-              if(!ev.tag) ev.tag = 'Convention Center';
-            }
-          }catch{}
-        }
-        EVENTS[i]=ev;
-      }
-    }
+    const resp = await fetch('Events/index.json', { cache: 'no-cache' });
+    if(!resp.ok) throw new Error('events index.json not found');
+    const data = await resp.json();
+    if(Array.isArray(data)) EVENTS = data.filter(Boolean);
+    else if(Array.isArray(data.events)) EVENTS = data.events.filter(Boolean);
   }catch(e){
     console.warn('[Events] Failed to load events:', e);
     EVENTS = [];
@@ -1993,7 +1765,10 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   const exitBtn = document.getElementById('exitFloor');
   if(prevBtn) prevBtn.addEventListener('click', ()=> setFloorIdx(floorIdx-1));
   if(nextBtn) nextBtn.addEventListener('click', ()=> setFloorIdx(floorIdx+1));
-  if(exitBtn) exitBtn.addEventListener('click', exitFloorNow);
+  if(exitBtn) exitBtn.addEventListener('click', ()=> {
+    if(current==='convention_floor') go('convention');
+    else if(current==='expo_floor') go('expo');
+  });
 });
 
 // Variant engine scaffold (will expand for additional radical redesigns)
