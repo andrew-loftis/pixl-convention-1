@@ -32,10 +32,10 @@ video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;backgrou
 .stage-overlay{position:absolute;inset:0;pointer-events:none;background:linear-gradient(90deg, rgba(6,10,18,.68) 0%, rgba(6,10,18,.42) 18%, rgba(6,10,18,.18) 32%, rgba(6,10,18,0) 48%);z-index:3;}
 /* Short-lived black overlay to mask Pi compositor white flashes during transitions */
 #xfadeGuard{position:fixed;inset:0;background:#000;opacity:0;transition:opacity .12s ease;pointer-events:none;z-index:40;}
-#xfadeGuard.show{opacity:.08;}
+#xfadeGuard.show{opacity:.2;}
 /* Connected horizontal button rail */
 /* Left-side glass panel ------------------------------------------------------- */
-#panel{position:fixed;top:0;bottom:0;left:0;width:var(--panel-w);height:100vh;display:flex;flex-direction:column;gap:.6rem;padding:1rem .9rem;background:transparent;border:0;box-shadow:none;z-index:6;overflow:visible;pointer-events:none;}
+#panel{position:fixed;top:0;bottom:0;left:0;width:var(--panel-w);height:100vh;display:flex;flex-direction:column;gap:.6rem;padding:1rem .9rem;background:transparent;border:0;box-shadow:none;z-index:6;overflow:visible;pointer-events:none;will-change:transform;transform:translateZ(0);}
 #panel:before{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(90deg,rgba(255,255,255,.08),rgba(255,255,255,.02) 55%,transparent);opacity:.18;}
 .panel-header{display:none;}
 .panel-state{font-size:1rem;font-weight:600;letter-spacing:.18px;color:#fff;position:fixed;left:26px;top:calc(var(--nav-offset,160px) - 66px);z-index:8;display:flex;align-items:center;gap:.6rem;opacity:.95;line-height:1.2;text-shadow:0 1px 2px rgba(0,0,0,.5);} 
@@ -270,6 +270,10 @@ body.floor-config-active #ui .inline-floor-panel.exit-inline button:hover{color:
 body.transitioning *{ scrollbar-color: rgba(0,0,0,0) rgba(0,0,0,0); }
 body.transitioning ::-webkit-scrollbar{ width:0 !important; height:0 !important; background:transparent !important; }
 body.transitioning *:focus{ outline: none !important; }
+/* Freeze nav/button animations during transitions to avoid compositing thrash on Pi */
+body.transitioning #ui, body.transitioning #ui *{ transition: none !important; animation: none !important; }
+body.transitioning #ui .btn:hover{ color: inherit !important; text-shadow:none !important; }
+body.transitioning #ui .btn.active{ font-size: inherit !important; font-weight: 800 !important; text-shadow:none !important; transform:none !important; }
 
 /* Mobile "app bar" layout */
 @media (max-width:800px){
@@ -319,16 +323,6 @@ video {
 body.transitioning *{
   -webkit-backdrop-filter: none !important;
   backdrop-filter: none !important;
-}
-body.transitioning .modal .content,
-body.transitioning .evt-card,
-body.transitioning #panel,
-body.transitioning .ui-scrim,
-body.transitioning .hud-clock,
-body.transitioning .tool-btn,
-body.transitioning #floorOptions{
-  background: rgba(0,0,0,.55) !important;
-  box-shadow: none !important;
 }
 
 /* Ensure black background is always visible during transitions */
@@ -1174,6 +1168,9 @@ function playTransition(viaFile, destLoop, destId){
       next.style.transition='opacity .3s ease'; // slower transition for smoother Pi performance
       next.style.opacity='1';
       try{ active.pause(); }catch(e){}
+      // First frame visible: drop guard now to avoid over-darkening UI
+      document.body.classList.remove('transitioning');
+      document.getElementById('xfadeGuard')?.classList.remove('show');
     }
     async function finalize(reason){
       if(finalized) return; finalized=true; currentTransitionAbort=null; if(timeCheckInterval) clearInterval(timeCheckInterval);
