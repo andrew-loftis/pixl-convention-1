@@ -344,7 +344,6 @@ video {
 .event-hero{
   position:relative;flex:0 0 44%;min-width:44%;height:100%;
   border-radius:8px;background:#111a28 center/cover no-repeat;border:0;overflow:hidden;
-  background-image:url('https://picsum.photos/seed/cc-coffee/800/1000');
 }
 .event-hero::after{content:"";position:absolute;top:0;right:0;width:clamp(36px, 14%, 80px);height:100%;pointer-events:none;background:linear-gradient(90deg, rgba(12,16,24,0) 0%, rgba(12,16,24,0.5) 55%, rgba(12,16,24,0.9) 100%);} 
 .event-body{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:.22rem;padding-left:.5rem;}
@@ -361,9 +360,28 @@ video {
 .tool-btn:hover{background:rgba(12,16,24,.72);}
 .tool-btn:active{transform:translateY(1px);} 
 .tool-btn:focus{outline:2px solid rgba(245,158,11,.6);} 
+
+/* ---------- Startup preloader overlay ---------- */
+#preloadOverlay{position:fixed;inset:0;background:#000;z-index:9999;display:none;align-items:center;justify-content:center;color:#fff;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;}
+#preloadOverlay.show{display:flex;}
+#preloadBox{display:flex;flex-direction:column;gap:16px;align-items:center;max-width:min(86vw, 720px);text-align:center;padding:24px 28px;border-radius:12px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);box-shadow:0 12px 32px -18px rgba(0,0,0,.7), inset 0 0 0 1px rgba(255,255,255,.03);} 
+#preloadTitle{font-size:1rem;font-weight:700;color:#e9eef8;letter-spacing:.2px;}
+#preloadProgress{width:min(72vw, 560px);height:8px;background:rgba(255,255,255,.08);border-radius:999px;overflow:hidden;}
+#preloadBar{height:100%;width:0;background:linear-gradient(90deg,#60a5fa,#34d399);transition:width .25s ease;}
+#preloadText{font-size:.9rem;color:#cdd6e3;}
+#preloadSkipBtn{display:none;margin-top:2px;background:#1c2433;color:#e5efff;border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:.45rem .8rem;font-weight:700;letter-spacing:.2px;cursor:pointer;}
+#preloadSkipBtn:hover{filter:brightness(1.05);} 
 </style>
 </head>
 <body>
+<div id="preloadOverlay" aria-live="polite" aria-label="Loading videos">
+  <div id="preloadBox">
+    <div id="preloadTitle">Preparing media…</div>
+    <div id="preloadProgress"><div id="preloadBar"></div></div>
+    <div id="preloadText">Initializing…</div>
+    <button id="preloadSkipBtn" type="button" aria-label="Skip preloading">Start now</button>
+  </div>
+</div>
 <header>Convention Center Navigator <span class="badge">Beta</span></header>
 <div id="stage">
   <div id="stage-backdrop"></div>
@@ -713,6 +731,11 @@ init();
 
 async function init(){
   disableUI(true);
+  const params=new URLSearchParams(location.search);
+  const skip=params.has('skipPreload');
+  if(!skip){
+    try{ await preloadAllVideos(); }catch(e){ console.warn('[CC][PRELOAD] failed', e); }
+  }
   await loadLoop(states[current].loop);
   try { await active.play(); } catch(e) {}
   setState(current);
@@ -752,6 +775,74 @@ document.addEventListener('DOMContentLoaded', ()=>{
   if(fsBtn) fsBtn.addEventListener('click', toggleFS);
   if(resetCtl) resetCtl.addEventListener('click', doReset);
 });
+
+// ------------------------ Full preloader (all videos) ------------------------
+function showPreloadOverlay(show){
+  const ov=document.getElementById('preloadOverlay'); if(!ov) return;
+  ov.classList.toggle('show', !!show);
+}
+function updatePreloadProgress(done,total,label){
+  const bar=document.getElementById('preloadBar');
+  const text=document.getElementById('preloadText');
+  const pct = total? Math.round((done/total)*100):0;
+  if(bar) bar.style.width = pct + '%';
+  if(text) text.textContent = (label||'Loading') + ' • ' + pct + '%';
+}
+
+async function preloadAllVideos(){
+  // Collect all loop base names and transitions
+  const loopNames = Array.from(new Set(Object.values(states).map(s=>s.loop).filter(Boolean)));
+  // Resolve loop variants (e.g., _high/_med/_low) except intro
+  const resolvedLoops = await Promise.all(loopNames.map(n=>resolveLoopFilename(n)));
+  const transitionNames = [];
+  Object.values(states).forEach(s=>{ if(s.transitions){ Object.values(s.transitions).forEach(t=>{ if(t) transitionNames.push(t); }); } });
+  const allClips = Array.from(new Set([...resolvedLoops, ...transitionNames]));
+  const posters = resolvedLoops.map(posterFor);
+
+  const total = allClips.length + posters.length;
+  let done = 0;
+  showPreloadOverlay(true);
+  updatePreloadProgress(0,total,'Preparing');
+  let skip=false; const skipBtn=document.getElementById('preloadSkipBtn'); if(skipBtn){
+    const showTimer=setTimeout(()=>{ skipBtn.style.display='inline-flex'; }, 2500);
+    const onSkip=()=>{ skip=true; skipBtn.removeEventListener('click', onSkip); };
+    skipBtn.addEventListener('click', onSkip);
+  }
+
+  // Helper to load a single video to canplaythrough/currentTime>0
+  async function loadVideo(src){
+    return new Promise((resolve)=>{
+      const v=document.createElement('video');
+      v.preload='auto'; v.muted=true; v.playsInline=true;
+      const cleanup=()=>{ v.removeAttribute('src'); v.load(); };
+      const finish=()=>{ cleanup(); resolve(); };
+      let timer=setTimeout(finish, 14000); // generous per-clip timeout for Pi
+      v.addEventListener('canplaythrough',()=>{ clearTimeout(timer); finish(); },{once:true});
+      v.addEventListener('error',()=>{ clearTimeout(timer); finish(); },{once:true});
+      v.src = base + src;
+      // Kick decode path; ignore failures
+      v.play().then(()=>{ try{ v.pause(); }catch{} }).catch(()=>{});
+    });
+  }
+  async function loadImage(url){
+    return new Promise((resolve)=>{ const i=new Image(); i.onload=resolve; i.onerror=resolve; i.src=url; });
+  }
+
+  // Sequential to avoid hammering Pi I/O; update progress per item
+  for(const clip of allClips){
+    if(skip) break;
+    try{ await loadVideo(clip); }finally{ done++; updatePreloadProgress(done,total,'Caching video'); }
+  }
+  for(const p of posters){
+    if(skip) break;
+    try{ await loadImage(p); }finally{ done++; updatePreloadProgress(done,total,'Caching posters'); }
+  }
+  // Add <link rel=preload> hints so browser can reuse cache pipeline
+  allClips.forEach(c=>{ const l=document.createElement('link'); l.rel='preload'; l.as='video'; l.href=base+c; document.head.appendChild(l); });
+  posters.forEach(p=>{ const l=document.createElement('link'); l.rel='preload'; l.as='image'; l.href=p; document.head.appendChild(l); });
+
+  showPreloadOverlay(false);
+}
 
 // Inline SVG line icons (placeholder set) – replace with production emblems later
 const ICONS = {
@@ -827,7 +918,7 @@ function updateNavActive(){
       const parentKey = current==='convention_floor' ? 'convention' : 'expo';
       const parentBtn = ui.querySelector(`.btn[data-dest="${parentKey}"]`);
       if(parentBtn) parentBtn.insertAdjacentElement('afterend', exitBtn); else ui.prepend(exitBtn);
-      exitBtn.addEventListener('click', ()=>{ if(current==='convention_floor') go('convention'); else if(current==='expo_floor') go('expo'); });
+      exitBtn.addEventListener('click', exitFloorNow);
     }
     // During floor, force selectedNav to synthetic exit
     selectedNav='__exit_floor';
@@ -1557,9 +1648,7 @@ document.addEventListener('click',(e)=>{
       console.log('[FLOOR] nextLayout click');
       setFloorIdx(floorIdx+1); break;
     case 'exitFloor':
-      console.log('[FLOOR] exitFloor click from', current);
-      if(current==='convention_floor') go('convention');
-      else if(current==='expo_floor') go('expo');
+      exitFloorNow();
       break;
   }
   if(typeof syncBannerHeight==='function') syncBannerHeight();
@@ -1572,6 +1661,17 @@ function syncMenuVisibilityForFloor(){
   if(!ui) return;
   // Floor mode visibility handled by updateFloorUIVisibility. Keep defaults here.
   ui.style.display = '';
+}
+
+// Centralized floor exit handler to avoid duplicate logic
+function exitFloorNow(){
+  console.log('[FLOOR] exitFloor click from', current, 'isTransitioning=', isTransitioning);
+  if(isTransitioning){
+    // If a transition is running, abort and go straight to parent state
+    try{ if(currentTransitionAbort) currentTransitionAbort('floor-exit'); }catch{}
+  }
+  if(current==='convention_floor') go('convention');
+  else if(current==='expo_floor') go('expo');
 }
 
 // Reset button logic
@@ -1699,18 +1799,28 @@ document.addEventListener('DOMContentLoaded', ()=>{
 });
 computeNavOffset();
 
-// ---------- Event popup slideshow ----------
-const EVENTS = [
-  { title:'Saints Dark Coffee', tag:'Convention Center', desc:'Small-batch roastery pop-up featuring limited origin espresso and seasonal pastries. Visit us on the main concourse.', distance:'110 m', hours:'9:00–5:00', spot:'Booth A127', hero:'https://picsum.photos/seed/cc-coffee/800/1000' },
-  { title:'Robotics Makerspace', tag:'Expo Center', desc:'Hands-on demos of student-built robots and interactive STEM exhibits. Family friendly.', distance:'240 m', hours:'10:00–6:00', spot:'Hall C • E214', hero:'https://picsum.photos/seed/cc-robotics/800/1000' },
-  { title:'Food Truck Rally', tag:'Midway', desc:'Local trucks featuring tacos, BBQ, and vegan options. Live DJ 12–2 PM.', distance:'350 m', hours:'11:00–8:00', spot:'Lot M2', hero:'https://picsum.photos/seed/cc-foodtruck/800/1000' },
-  { title:'Summer Concert Series', tag:'Ampitheatre', desc:'Outdoor performance featuring regional artists. Lawn seating—blankets encouraged.', distance:'480 m', hours:'7:00–9:30', spot:'Main Stage', hero:'https://picsum.photos/seed/cc-concert/800/1000' },
-  { title:'Art & Craft Fair', tag:'Pavilion', desc:'Juried makers and artisans with booths across the pavilion. Workshops hourly.', distance:'220 m', hours:'10:00–4:00', spot:'Row A • P104', hero:'https://picsum.photos/seed/cc-craft/800/1000' },
-];
-
+// ---------- Event popup slideshow (dynamic from /events/index.json) ----------
+let EVENTS = [];
 let eventIdx = 0;
 let eventTimer = null;
+
+async function loadEvents(){
+  try{
+    const resp = await fetch('Events/index.json', { cache: 'no-cache' });
+    if(!resp.ok) throw new Error('events index.json not found');
+    const data = await resp.json();
+    if(Array.isArray(data)) EVENTS = data.filter(Boolean);
+    else if(Array.isArray(data.events)) EVENTS = data.events.filter(Boolean);
+  }catch(e){
+    console.warn('[Events] Failed to load events:', e);
+    EVENTS = [];
+  }
+  const popup = document.getElementById('eventPopup');
+  if(popup){ popup.style.display = EVENTS.length ? 'flex' : 'none'; }
+}
+
 function renderEvent(i){
+  if(!EVENTS.length) return;
   const e = EVENTS[i % EVENTS.length];
   const hero = document.getElementById('eventHero');
   const tag = document.getElementById('eventTag');
@@ -1719,16 +1829,17 @@ function renderEvent(i){
   const dist = document.getElementById('eventDistance');
   const hours = document.getElementById('eventHours');
   const spot = document.getElementById('eventSpot');
-  if(hero) hero.style.backgroundImage = `url('${e.hero}')`;
-  if(tag) tag.textContent = e.tag;
-  if(title) title.textContent = e.title;
-  if(desc) desc.textContent = e.desc;
-  if(dist) dist.textContent = e.distance;
-  if(hours) hours.textContent = e.hours;
-  if(spot) spot.textContent = e.spot;
+  if(hero) hero.style.backgroundImage = e.hero ? `url('${e.hero}')` : 'none';
+  if(tag) tag.textContent = e.tag || '';
+  if(title) title.textContent = e.title || '';
+  if(desc) desc.textContent = e.desc || '';
+  if(dist) dist.textContent = e.distance || '';
+  if(hours) hours.textContent = e.hours || '';
+  if(spot) spot.textContent = e.spot || '';
 }
 
 function startEventSlideshow(){
+  if(!EVENTS.length) return;
   stopEventSlideshow();
   renderEvent(eventIdx);
   eventTimer = setInterval(()=>{ eventIdx = (eventIdx+1)%EVENTS.length; renderEvent(eventIdx); }, 5000);
@@ -1739,14 +1850,15 @@ function syncEventSlideshow(){
   const popup = document.getElementById('eventPopup');
   if(!popup) return;
   const isHidden = window.getComputedStyle(popup).display === 'none';
-  if(isFloor || isHidden){ stopEventSlideshow(); }
+  if(isFloor || isHidden || !EVENTS.length){ stopEventSlideshow(); }
   else { startEventSlideshow(); }
 }
-document.addEventListener('DOMContentLoaded', ()=>{ 
+document.addEventListener('DOMContentLoaded', async ()=>{ 
+  await loadEvents();
   // Preload hero images for smoother first swaps
-  try{ EVENTS.forEach(e=>{ const i=new Image(); i.crossOrigin='anonymous'; i.src=e.hero; }); }catch{}
+  try{ EVENTS.forEach(e=>{ if(e.hero){ const i=new Image(); i.crossOrigin='anonymous'; i.src=e.hero; } }); }catch{}
   // Render first event immediately so an image is visible even if slideshow is paused
-  try{ renderEvent(0); }catch{}
+  try{ if(EVENTS.length) renderEvent(0); }catch{}
   setTimeout(syncEventSlideshow, 100); 
   // Attach floor plan control handlers explicitly (in case delegation misses due to layering)
   const prevBtn = document.getElementById('prevLayout');
@@ -1754,10 +1866,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
   const exitBtn = document.getElementById('exitFloor');
   if(prevBtn) prevBtn.addEventListener('click', ()=> setFloorIdx(floorIdx-1));
   if(nextBtn) nextBtn.addEventListener('click', ()=> setFloorIdx(floorIdx+1));
-  if(exitBtn) exitBtn.addEventListener('click', ()=> {
-    if(current==='convention_floor') go('convention');
-    else if(current==='expo_floor') go('expo');
-  });
+  if(exitBtn) exitBtn.addEventListener('click', exitFloorNow);
 });
 
 // Variant engine scaffold (will expand for additional radical redesigns)

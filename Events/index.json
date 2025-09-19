@@ -1,0 +1,47 @@
+[
+  {
+    "title": "Statemint Pop Up Consignment Shop",
+    "tag": "Convention Center",
+    "desc": "Shop 50-80% off retail prices at our Pop-Up Consignment Shop! Over 200+ closets to browse.",
+    "distance": "On-site",
+    "hours": "Sep 4–7, 10AM–8PM",
+    "spot": "Main Hall",
+    "hero": "Events/Statemint Pop Up Consignment Shop/aa27b1_ffa08a319c484c3bbc8d92a2645ee67e~mv2.avif"
+  },
+  {
+    "title": "Agoge Fight League",
+    "tag": "Convention Center",
+    "desc": "The Agoge Fight League is coming to Cookeville — live action all evening.",
+    "distance": "On-site",
+    "hours": "Sep 20, 2PM–10PM",
+    "spot": "Arena",
+    "hero": "Events/Agoge Fight League/aa27b1_80b854dba4134047a92fa74b833594b9~mv2.avif"
+  },
+  {
+    "title": "Disco For A Difference",
+    "tag": "Convention Center",
+    "desc": "Dinner, drinks, and dancing to celebrate 50 years of Helping Hands.",
+    "distance": "On-site",
+    "hours": "Oct 4, 6PM–10PM",
+    "spot": "Ballroom",
+    "hero": "Events/Disco For A Difference/aa27b1_4b8f690c419b46be86d16d06ac9f9b90~mv2.avif"
+  },
+  {
+    "title": "Putnam County Fall Home Show",
+    "tag": "Convention Center",
+    "desc": "Meet specialists across home improvement categories with live demos.",
+    "distance": "On-site",
+    "hours": "Sep 13–14, 10AM–6PM",
+    "spot": "Exhibit Hall",
+    "hero": "Events/Putnam County Fall Home Show/aa27b1_66a14e8d63dc465790c790d97965fb8c~mv2.avif"
+  },
+  {
+    "title": "Cookeville Pink Bride Wedding & Women's Show",
+    "tag": "Convention Center",
+    "desc": "The wedding planning event of the year comes to Cookeville.",
+    "distance": "On-site",
+    "hours": "Aug 24",
+    "spot": "Grand Lobby",
+    "hero": "Events/Cookeville Pink Bride Wedding & Women's Show/aa27b1_f565e9c8259044f9831aebe7cb3f3069~mv2.avif"
+  }
+]
