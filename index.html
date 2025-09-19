@@ -97,7 +97,7 @@ overflow:hidden;display:flex;align-items:center;justify-content:center;}
   .floor-ctr{display:none !important;}
 }
 /* Bottom-right dock (shows events/info normally; switches to floor carousel in floor modes) */
-.floor-full{display:block;position:fixed;left:auto;right:24px;bottom:24px;width:clamp(210px,16vw,270px);height:clamp(150px,19vh,230px);z-index:12;border:1px solid rgba(255,255,255,.1);border-radius:18px;padding:.6rem .65rem .8rem;background:rgba(10,16,26,.44);backdrop-filter:blur(18px) saturate(170%);-webkit-backdrop-filter:blur(18px) saturate(170%);box-shadow:0 16px 42px -18px rgba(0,0,0,.72),0 0 0 1px rgba(255,255,255,.05) inset;min-height:0;overflow:hidden;}
+.floor-full{display:block;position:fixed;left:auto;right:24px;bottom:24px;width:clamp(105px,8vw,135px);height:clamp(75px,9.5vh,115px);z-index:12;border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:.4rem .45rem .5rem;background:rgba(10,16,26,.44);backdrop-filter:blur(18px) saturate(170%);-webkit-backdrop-filter:blur(18px) saturate(170%);box-shadow:0 16px 42px -18px rgba(0,0,0,.72),0 0 0 1px rgba(255,255,255,.05) inset;min-height:0;overflow:hidden;font-size:.7rem;}
 /* Variant system: floor-full gains a modifier class when in radical layout */
 .floor-full.variant-v1{right:32px;bottom:32px;width:clamp(700px,54vw,1040px);height:clamp(420px,60vh,720px);padding:1rem 1.1rem 1.2rem;border-radius:26px;background:rgba(14,20,30,.55);box-shadow:0 28px 68px -26px rgba(0,0,0,.78),0 4px 22px -8px rgba(0,0,0,.55),0 0 0 1px rgba(255,255,255,.06) inset;display:flex;flex-direction:column;}
 .floor-full.variant-v1:before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 18% 22%,rgba(255,255,255,.12),transparent 60%),linear-gradient(135deg,rgba(255,255,255,.08),rgba(255,255,255,.02) 45%,transparent);mix-blend-mode:overlay;opacity:.35;pointer-events:none;}
@@ -281,9 +281,15 @@ body.floor-config-active #ui .inline-floor-panel.exit-inline button:hover{color:
 }
 /* (Old horizontal bar styles removed / replaced above) */
 .badge{background:#f3e4d6;color:#1b1b1b;font-weight:700;font-size:.55rem;padding:.2rem .45rem;border-radius:999px;margin-left:.45rem;}
-/* Crossfade for instant (no transition file) switches */
-#active.crossfade-enter{opacity:0;transition:opacity .4s ease;}
+/* Crossfade for instant (no transition file) switches - Enhanced for Pi */
+#active.crossfade-enter{opacity:0;transition:opacity .5s ease;}
 #active.crossfade-enter.crossfade-show{opacity:1;}
+
+/* Ensure temporary crossfade videos always stay above active video */
+video.crossfade-temp {
+  z-index: 4 !important;
+  background: #000;
+}
 
 /* Raspberry Pi optimizations */
 video {
@@ -953,18 +959,49 @@ async function instantSwitch(dest){
   const newLoop = states[dest].loop;
   const resolved = await resolveLoopFilename(newLoop);
   const tmp = document.createElement('video');
-  tmp.muted=true; tmp.playsInline=true; tmp.loop=true; tmp.style.position='absolute'; tmp.style.inset='0'; tmp.style.width='100%'; tmp.style.height='100%'; tmp.style.objectFit='cover'; tmp.style.opacity='0'; tmp.style.zIndex='3';
+  tmp.muted=true; tmp.playsInline=true; tmp.loop=true; 
+  tmp.style.position='absolute'; tmp.style.inset='0'; tmp.style.width='100%'; tmp.style.height='100%'; 
+  tmp.style.objectFit='cover'; tmp.style.opacity='0'; tmp.style.zIndex='4'; tmp.style.background='#000';
+  tmp.className = 'crossfade-temp';
   tmp.src = base + resolved;
   applyPoster(tmp, resolved);
   document.getElementById('stage').appendChild(tmp);
+  
+  // Enhanced wait for Pi - ensure video is fully ready
   await waitReady(tmp);
-  try{ await tmp.play(); }catch(e){}
+  
+  // Additional check for video dimensions to ensure it's actually loaded
+  let attempts = 0;
+  while((tmp.videoWidth === 0 || tmp.readyState < 3) && attempts < 20) {
+    await new Promise(r => setTimeout(r, 50));
+    attempts++;
+  }
+  
+  try{ await tmp.play(); }catch(e){ console.warn('[CC] tmp.play fail', e); }
+  
+  // Wait for first frame before starting crossfade
+  await new Promise(resolve => {
+    if(tmp.currentTime > 0 || tmp.readyState >= 4) {
+      resolve();
+    } else {
+      const onReady = () => {
+        tmp.removeEventListener('timeupdate', onReady);
+        tmp.removeEventListener('canplaythrough', onReady);
+        resolve();
+      };
+      tmp.addEventListener('timeupdate', onReady);
+      tmp.addEventListener('canplaythrough', onReady);
+      setTimeout(resolve, 300); // fallback
+    }
+  });
+  
   tmp.classList.add('crossfade-enter');
   requestAnimationFrame(()=>{ tmp.classList.add('crossfade-show'); });
+  
   // Promote tmp to active only after active video prepared to eliminate black flash
   setTimeout(async ()=>{
     try {
-  active.src = tmp.src;
+      active.src = tmp.src;
       active.loop = true;
       await waitReady(active);
       try { await active.play(); } catch(e) {}
@@ -974,7 +1011,7 @@ async function instantSwitch(dest){
     setState(dest);
     isTransitioning = false;
     status('Ready');
-  }, 600); // slightly longer to ensure new loop buffered
+  }, 700); // longer timeout for Pi reliability
 }
 
 function playTransition(viaFile, destLoop, destId){
