@@ -97,7 +97,7 @@ overflow:hidden;display:flex;align-items:center;justify-content:center;}
   .floor-ctr{display:none !important;}
 }
 /* Bottom-right dock (shows events/info normally; switches to floor carousel in floor modes) */
-.floor-full{display:block;position:fixed;left:auto;right:24px;bottom:24px;width:clamp(420px,32vw,540px);height:clamp(300px,38vh,460px);z-index:12;border:1px solid rgba(255,255,255,.1);border-radius:18px;padding:.8rem .85rem 1rem;background:rgba(10,16,26,.44);backdrop-filter:blur(18px) saturate(170%);-webkit-backdrop-filter:blur(18px) saturate(170%);box-shadow:0 16px 42px -18px rgba(0,0,0,.72),0 0 0 1px rgba(255,255,255,.05) inset;min-height:0;overflow:hidden;}
+.floor-full{display:block;position:fixed;left:auto;right:24px;bottom:24px;width:clamp(210px,16vw,270px);height:clamp(150px,19vh,230px);z-index:12;border:1px solid rgba(255,255,255,.1);border-radius:18px;padding:.6rem .65rem .8rem;background:rgba(10,16,26,.44);backdrop-filter:blur(18px) saturate(170%);-webkit-backdrop-filter:blur(18px) saturate(170%);box-shadow:0 16px 42px -18px rgba(0,0,0,.72),0 0 0 1px rgba(255,255,255,.05) inset;min-height:0;overflow:hidden;}
 /* Variant system: floor-full gains a modifier class when in radical layout */
 .floor-full.variant-v1{right:32px;bottom:32px;width:clamp(700px,54vw,1040px);height:clamp(420px,60vh,720px);padding:1rem 1.1rem 1.2rem;border-radius:26px;background:rgba(14,20,30,.55);box-shadow:0 28px 68px -26px rgba(0,0,0,.78),0 4px 22px -8px rgba(0,0,0,.55),0 0 0 1px rgba(255,255,255,.06) inset;display:flex;flex-direction:column;}
 .floor-full.variant-v1:before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 18% 22%,rgba(255,255,255,.12),transparent 60%),linear-gradient(135deg,rgba(255,255,255,.08),rgba(255,255,255,.02) 45%,transparent);mix-blend-mode:overlay;opacity:.35;pointer-events:none;}
@@ -308,6 +308,11 @@ video {
   bottom: 0;
   background: #000;
   z-index: -2;
+}
+
+/* Hide fullscreen button */
+#btnFullscreen {
+  display: none !important;
 }
 /* (footer removed; status now floats bottom-right) */
 
@@ -643,6 +648,8 @@ function persistState(state){
 // Start from last state if available
 let current = restoreState();
 let isTransitioning = false; // prevent overlapping transition execution (we still allow interruption)
+let lastClickTime = 0; // debounce rapid clicks
+const CLICK_DEBOUNCE_MS = 500; // minimum time between transitions
 let queuedDest = null; // destination requested while a transition is running
 let pendingDest = null; // destination the current transition is moving toward
 let currentTransitionAbort = null; // function to finalize current transition early
@@ -855,6 +862,13 @@ function injectInlineFloorPanel(){
 }
 
 async function go(dest){
+  const now = Date.now();
+  if(now - lastClickTime < CLICK_DEBOUNCE_MS && isTransitioning) {
+    console.log('[CC][GO] debounced rapid click for', dest);
+    return;
+  }
+  lastClickTime = now;
+
   if(dest===current && !isTransitioning) { console.log('[CC][GO] ignoring same-state request', dest); return; }
   if(isTransitioning){
     if(dest !== pendingDest){
@@ -988,9 +1002,14 @@ function playTransition(viaFile, destLoop, destId){
     })();
     function showFirstFrame(){
       if(firstFrameShown) return;
+      // Extra check for Pi - ensure we have actual video data
+      if(next.readyState < 3 && next.currentTime === 0) {
+        console.log('[CC][TRANS] delaying showFirstFrame - not ready', next.readyState, next.currentTime);
+        return;
+      }
       firstFrameShown=true;
-      console.log('[CC][TRANS] showFirstFrame', viaFile, 't=', next.currentTime.toFixed(2));
-      next.style.transition='opacity .2s ease'; // slightly slower fade for better Pi performance
+      console.log('[CC][TRANS] showFirstFrame', viaFile, 't=', next.currentTime.toFixed(2), 'readyState=', next.readyState);
+      next.style.transition='opacity .3s ease'; // slower transition for smoother Pi performance
       next.style.opacity='1';
       try{ active.pause(); }catch(e){}
     }
@@ -1009,22 +1028,37 @@ function playTransition(viaFile, destLoop, destId){
     }
     function handleEnded(){ endedFired=true; if(timeCheckInterval) clearInterval(timeCheckInterval); console.log('[CC][TRANS] ended', viaFile); finalize('ended'); }
     next.addEventListener('error',()=>finalize('error'),{once:true});
-    // Legacy frame-detect listeners retained as safety - wait for actual frame data on Pi
+    // Enhanced frame-detect for Pi - wait for actual playable data
     let frameCheckCount=0;
     function onProgress(){
-      if(next.currentTime>0 || next.readyState>=3){ showFirstFrame(); next.removeEventListener('timeupdate',onProgress); next.removeEventListener('playing',onProgress); }
-      else if(frameCheckCount++>40){ showFirstFrame(); }
+      if((next.currentTime>0.1 || next.readyState>=4) && next.videoWidth > 0){ 
+        showFirstFrame(); 
+        next.removeEventListener('timeupdate',onProgress); 
+        next.removeEventListener('playing',onProgress);
+        next.removeEventListener('canplay',onProgress);
+        next.removeEventListener('canplaythrough',onProgress);
+      }
+      else if(frameCheckCount++>60){ 
+        console.log('[CC][TRANS] forcing showFirstFrame after timeout');
+        showFirstFrame(); 
+      }
     }
     next.addEventListener('timeupdate',onProgress);
     next.addEventListener('playing',onProgress);
-    next.addEventListener('canplay',onProgress); // Additional trigger for Pi compatibility
+    next.addEventListener('canplay',onProgress);
+    next.addEventListener('canplaythrough',onProgress); // Better for Pi
     try{ await next.play(); }catch(e){ console.warn('[CC] next.play fail',e,'-> instant fallback'); finalize('play-fail'); return; }
-    // Modified: Wait for canplay before showing overlay for better Pi performance
-    if(next.readyState >= 3 || next.currentTime > 0) {
+    // Enhanced: Wait for better readiness indicators before showing overlay
+    if((next.readyState >= 4 || next.currentTime > 0.1) && next.videoWidth > 0) {
       showFirstFrame();
     } else {
-      // Fallback timeout for slow loading on Pi
-      setTimeout(() => { if(!firstFrameShown) showFirstFrame(); }, 200);
+      // Longer fallback timeout for Pi - sometimes needs more time
+      setTimeout(() => { 
+        if(!firstFrameShown) {
+          console.log('[CC][TRANS] fallback timeout showFirstFrame');
+          showFirstFrame(); 
+        }
+      }, 500);
     }
     timeCheckInterval = setInterval(()=>{ if(next.duration && next.currentTime >= next.duration && !endedFired){ handleEnded(); } },100);
     setTimeout(()=>{ if(!finalized && !endedFired){ console.warn('[CC] watchdog finalize (no ended)', viaFile); finalize('watchdog'); } },60000);
