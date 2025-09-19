@@ -24,7 +24,7 @@ video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;backgrou
 #active{z-index:1;}
 #next{z-index:2;}
 #buffer{z-index:0;}
-#next,#buffer{opacity:0;pointer-events:none;}
+#next,#buffer{opacity:0;pointer-events:none;visibility:hidden;}
 #active,#next,#buffer{background:#000 !important;}
 .fade-in{animation:fade .4s ease forwards;}
 @keyframes fade{from{opacity:0}to{opacity:1}}
@@ -1078,7 +1078,7 @@ async function instantSwitch(dest){
   const tmp = document.createElement('video');
   tmp.muted=true; tmp.playsInline=true; tmp.loop=true; 
   tmp.style.position='absolute'; tmp.style.inset='0'; tmp.style.width='100%'; tmp.style.height='100%'; 
-  tmp.style.objectFit='cover'; tmp.style.opacity='0'; tmp.style.zIndex='4'; tmp.style.background='#000';
+  tmp.style.objectFit='cover'; tmp.style.opacity='0'; tmp.style.zIndex='4'; tmp.style.background='#000'; tmp.style.visibility='hidden';
   tmp.className = 'crossfade-temp';
   tmp.src = base + resolved;
   applyPoster(tmp, resolved);
@@ -1095,23 +1095,24 @@ async function instantSwitch(dest){
   }
   
   try{ await tmp.play(); }catch(e){ console.warn('[CC] tmp.play fail', e); }
-  
-  // Wait for first frame before starting crossfade
+
+  // Wait for first frame and at least one paint before starting crossfade
   await new Promise(resolve => {
     if(tmp.currentTime > 0 || tmp.readyState >= 4) {
-      resolve();
+      requestAnimationFrame(()=>requestAnimationFrame(resolve));
     } else {
       const onReady = () => {
         tmp.removeEventListener('timeupdate', onReady);
         tmp.removeEventListener('canplaythrough', onReady);
-        resolve();
+        requestAnimationFrame(()=>requestAnimationFrame(resolve));
       };
       tmp.addEventListener('timeupdate', onReady);
       tmp.addEventListener('canplaythrough', onReady);
-      setTimeout(resolve, 300); // fallback
+      setTimeout(()=>requestAnimationFrame(()=>requestAnimationFrame(resolve)), 300); // fallback
     }
   });
-  
+  // Now reveal temp and crossfade
+  tmp.style.visibility='visible';
   tmp.classList.add('crossfade-enter');
   requestAnimationFrame(()=>{ tmp.classList.add('crossfade-show'); });
   
@@ -1156,7 +1157,7 @@ function playTransition(viaFile, destLoop, destId){
       const resolvedDest = await resolveLoopFilename(destLoop);
       buffer.src=base+resolvedDest; buffer.loop=true; applyPoster(buffer, resolvedDest); await waitReady(buffer,'preloadLoop:'+resolvedDest); 
     })();
-    function showFirstFrame(){
+    async function showFirstFrame(){
       if(firstFrameShown) return;
       // Extra check for Pi - ensure we have actual video data
       if(next.readyState < 3 && next.currentTime === 0) {
@@ -1165,6 +1166,11 @@ function playTransition(viaFile, destLoop, destId){
       }
       firstFrameShown=true;
       console.log('[CC][TRANS] showFirstFrame', viaFile, 't=', next.currentTime.toFixed(2), 'readyState=', next.readyState);
+      // Ensure a paint has happened before revealing to avoid white frame
+      await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+      // Make next the only visible layer before fade
+      next.style.visibility='visible';
+      active.style.visibility='visible';
       next.style.transition='opacity .3s ease'; // slower transition for smoother Pi performance
       next.style.opacity='1';
       try{ active.pause(); }catch(e){}
@@ -1187,6 +1193,10 @@ function playTransition(viaFile, destLoop, destId){
         // clear transition guard
         document.body.classList.remove('transitioning');
         document.getElementById('xfadeGuard')?.classList.remove('show');
+        // Hide non-active layers to ensure only one visible video
+        next.style.visibility='hidden';
+        buffer.style.visibility='hidden';
+        active.style.visibility='visible';
       },380);
     }
     function handleEnded(){ endedFired=true; if(timeCheckInterval) clearInterval(timeCheckInterval); console.log('[CC][TRANS] ended', viaFile); finalize('ended'); }
