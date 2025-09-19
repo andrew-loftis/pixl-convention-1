@@ -1,449 +1,1696 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Putnam Convention & Expo — Interactive Display</title>
-  <meta name="theme-color" content="#0E1116" />
-  <style>
-    :root{
-      --bg: #0b0f14;
-      --panel: rgba(255,255,255,0.06);
-      --panel-strong: rgba(255,255,255,0.12);
-      --text: #e9eef7;
-      --muted: #9fb3c8;
-      --brand: #00ffa7;
-      --brand-2: #60a5fa;
-      --danger: #ff6b6b;
-      --radius: 16px;
-      --blur: 12px;
-      --shadow: 0 10px 30px rgba(0,0,0,.35);
-    }
-    *{ box-sizing: border-box; }
-    html, body{ height:100%; }
-    body{
-      margin:0;
-      background: radial-gradient(1200px 900px at 20% -10%, #1a2230 0%, transparent 60%),
-                  radial-gradient(900px 700px at 120% 10%, #101827 0%, transparent 60%),
-                  var(--bg);
-      color: var(--text);
-      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
-      line-height:1.35;
-      -webkit-font-smoothing: antialiased;
-      -moz-osx-font-smoothing: grayscale;
-      overflow:hidden;
-    }
+<meta charset="utf-8" />
+<title>Convention Center Navigator</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<style>
+:root{ --banner-h: 22vh; --panel-w: clamp(280px, 28vw, 420px); --nav-clearance-gap: 120; 
+  --accent:#3b82f6; /* primary blue */
+  --accent-alt:#1d4ed8; /* deeper edge */
+  --accent-soft:rgba(59,130,246,.18);
+  --accent-soft-border:rgba(59,130,246,.38);
+  --accent-glow:0 0 6px rgba(59,130,246,.55);
+  --accent-glow-strong:0 0 14px rgba(59,130,246,.55),0 0 28px rgba(59,130,246,.35);
+}
+body{margin:0;font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;line-height:1.4;background:#0b1118;color:#e9edf4;display:flex;flex-direction:column;min-height:100vh;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;}
+header,footer{padding:.55rem .9rem;font-size:.65rem;letter-spacing:.5px;background:#0e1626;border-bottom:1px solid #1c2b45;}
+footer{border-top:1px solid #1c2b45;border-bottom:none;margin-top:auto;color:#9db0c7;}
+#stage{position:relative;flex:1;display:flex;overflow:hidden;} 
+video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#000;}
+#active{z-index:1;}
+#next{z-index:2;}
+#buffer{z-index:0;}
+#next,#buffer{opacity:0;pointer-events:none;}
+.fade-in{animation:fade .4s ease forwards;}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+/* Left-to-right dark gradient overlay for better left-side readability */
+.stage-overlay{position:absolute;inset:0;pointer-events:none;background:linear-gradient(90deg, rgba(6,10,18,.68) 0%, rgba(6,10,18,.42) 18%, rgba(6,10,18,.18) 32%, rgba(6,10,18,0) 48%);z-index:3;}
+/* Connected horizontal button rail */
+/* Left-side glass panel ------------------------------------------------------- */
+#panel{position:fixed;top:0;bottom:0;left:0;width:var(--panel-w);height:100vh;display:flex;flex-direction:column;gap:.6rem;padding:1rem .9rem;background:transparent;border:0;box-shadow:none;z-index:6;overflow:visible;pointer-events:none;}
+#panel:before{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(90deg,rgba(255,255,255,.08),rgba(255,255,255,.02) 55%,transparent);opacity:.18;}
+.panel-header{display:none;}
+.panel-state{font-size:1rem;font-weight:600;letter-spacing:.18px;color:#fff;position:fixed;left:26px;top:calc(var(--nav-offset,160px) - 66px);z-index:8;display:flex;align-items:center;gap:.6rem;opacity:.95;line-height:1.2;text-shadow:0 1px 2px rgba(0,0,0,.5);} 
+.panel-state:before{content:"";width:6px;height:6px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 4px var(--accent-soft);} 
+/* User request: remove visible current-state label above navigation */
+.panel-state{display:none !important;}
+.banner-head{position:relative;z-index:2;display:flex;align-items:center;gap:.6rem;}
+/* .banner-ticker removed per request */
 
-    /* Video stage */
-    #stage{
-      position:fixed; inset:0;
-      background: #000;
-      overflow:hidden;
-    }
-    video.display{
-      position:absolute; inset:0;
-      width:100%; height:100%;
-      object-fit:cover;
-      background:#000;
-    }
-    video.display.contain{ object-fit:contain; background:#000; }
-    video.display.hidden{ opacity:0; pointer-events:none; }
+/* Content area (left panel) */
+.banner-content{display:flex;flex-direction:column;gap:.5rem;align-items:stretch;min-height:0;min-width:0;flex:1 1 auto;}
+.banner-left{display:flex;flex-direction:column;gap:.25rem;min-height:0;padding-right:0;}
+.banner-right{display:none !important;}
 
-    /* UI Layer */
-    #ui{
-      position:fixed;
-      inset:0;
-      display:flex;
-      flex-direction:column;
-      justify-content:space-between;
-      pointer-events:none; /* buttons re-enable themselves */
-      padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
-    }
+/* Vertical button stack (centered like a name carousel) */
+#ui{position:fixed;left:26px;top:var(--nav-offset,160px);transform:none;display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-start;gap:.65rem;padding:.35rem .5rem .55rem .5rem;background:transparent;border:0;border-radius:12px;box-shadow:none;z-index:7;min-height:0;pointer-events:auto;transition:top .4s ease;} /* clamped vertical centering; increased gap */
+.ui-scrim{position:fixed;left:0;top:var(--scrim-top,0);width:300px;height:calc(100vh - var(--scrim-top,0) - var(--scrim-bottom-gap,0));border-radius:0;background:linear-gradient(90deg, rgba(6,10,18,.78), rgba(6,10,18,.34) 55%, rgba(6,10,18,0) 92%);z-index:6;pointer-events:none;overflow:hidden;}
+.ui-label{font-size:.6rem;letter-spacing:.18rem;text-transform:uppercase;color:#aebbd0;opacity:.92;margin:0 0 .9rem .25rem;text-shadow:0 1px 2px rgba(0,0,0,.5);position:fixed;left:34px;top:calc(var(--nav-offset,160px) - 30px);z-index:7;} 
+.ui-sep{height:1px;width:100%;background:linear-gradient(90deg, rgba(255,255,255,.06), rgba(255,255,255,0));margin:.35rem 0;}
+/* Extra: slightly increase separator density for a softly zoned list */
+.ui-sep + #ui .btn:not(.active){ opacity:.92; }
+/* Deemphasize placeholder items when not active */
+.btn[data-dest^="parking"], .btn[data-dest="pavilion"], .btn[data-dest="ampitheatre"], .btn[data-dest="midway"], .btn[data-dest="hotel"]{ color:#8c9db3; }
+.btn.active[data-dest^="parking"], .btn.active[data-dest="pavilion"], .btn.active[data-dest="ampitheatre"], .btn.active[data-dest="midway"], .btn.active[data-dest="hotel"]{ color:#fff; }
+#ui::-webkit-scrollbar{width:6px;}
+#ui::-webkit-scrollbar-track{background:transparent;}
+#ui::-webkit-scrollbar-thumb{background:rgba(255,255,255,.12);border-radius:3px;}
+/* Floor plan carousel (shown only in convention_floor) ----------------------- */
+.floor-ctr{position:relative;z-index:2;border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:.9rem .9rem;background:rgba(8,12,20,.22);backdrop-filter:blur(16px) saturate(160%);-webkit-backdrop-filter:blur(16px) saturate(160%);box-shadow:0 2px 12px -6px rgba(0,0,0,.6),0 0 0 1px rgba(255,255,255,.02) inset;margin-top:.25rem;flex:1;display:flex;flex-direction:column;min-height:0;}
+.floor-ctr{position:relative;z-index:2;border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:.7rem .7rem;background:rgba(8,12,20,.22);backdrop-filter:blur(16px) saturate(160%);-webkit-backdrop-filter:blur(16px) saturate(160%);box-shadow:0 2px 12px -6px rgba(0,0,0,.6),0 0 0 1px rgba(255,255,255,.02) inset;margin-top:.1rem;flex:0 1 auto;display:flex;flex-direction:column;min-height:0;}
+.floor-head{display:flex;align-items:center;justify-content:space-between;gap:.75rem;margin-bottom:.5rem;}
+.floor-title{font-size:.9rem;font-weight:700;letter-spacing:.4px;color:#fff;line-height:1.2;min-height:calc(2 * 1.2em);display:-webkit-box;-webkit-line-clamp:2;line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.floor-price{font-weight:800;color:#0c111b;background:linear-gradient(180deg,var(--accent),var(--accent-alt));padding:.3rem .55rem;border-radius:999px;border:1px solid var(--accent-soft-border);box-shadow:0 4px 16px -8px rgba(59,130,246,.4);font-size:.68rem;}
+.floor-desc{font-size:.62rem;color:#cfe3e6;line-height:1.35;letter-spacing:.3px;margin-bottom:.65rem;}
+.floor-controls{display:flex;align-items:center;justify-content:space-between;gap:.5rem;}
+.floor-btn{background:rgba(255,255,255,.08);color:#e8f4f6;border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:.45rem .7rem;font-size:.62rem;font-weight:700;letter-spacing:.45px;cursor:pointer;transition:background .25s,border-color .25s,color .25s;position:relative;z-index:2;}
+.floor-btn:hover{background:rgba(255,255,255,.14);}
+.floor-dots{display:flex;gap:.25rem;align-items:center;}
+.floor-dot{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.25);}
+.floor-dot.active{background:var(--accent);box-shadow:0 0 4px rgba(59,130,246,.45);} 
+/* Fill remaining space gracefully and pin actions to bottom */
+.floor-spacer{flex:1 1 auto;min-height:8px;}
+/* Legacy floor-actions removed in favor of new bottom control bar */
+.floor-panel{display:flex;flex-direction:column;position:relative;height:100%;}
+.floor-upper{flex:1 1 auto;display:flex;flex-direction:column;gap:.65rem;min-height:0;}
+.floor-preview-wrap{flex:1 1 auto;min-height:0;position:relative;}
+.floor-center .floor-preview{height:100%;min-height:200px;max-height:none;}
+.floor-info{flex:0 0 auto;}
+.floor-bottom-bar{position:absolute;left:.5rem;right:.5rem;bottom:.35rem;display:grid;grid-template-columns:120px 1fr 120px;align-items:center;gap:.75rem;}
+.floor-bottom-bar button{width:100%;}
+.floor-exit{justify-self:center;}
+.floor-exit{background:linear-gradient(180deg,#ef4444,#b91c1c);color:#1a0f0f;border:1px solid rgba(239,68,68,.8);border-radius:12px;padding:.5rem .85rem;font-size:.62rem;font-weight:800;letter-spacing:.5px;cursor:pointer;box-shadow:0 6px 22px -10px rgba(239,68,68,.55),0 0 0 1px rgba(239,68,68,.2) inset;}
+.floor-exit:hover{filter:saturate(1.05) brightness(1.02);} 
+/* Blueprint preview fills available space */
+.floor-preview{position:relative;flex:0 1 auto;height:clamp(180px,22vh,260px);min-height:180px;max-height:260px;border:1px solid rgba(255,255,255,.08);border-radius:10px;margin:.4rem 0;background:
+  linear-gradient(180deg,rgba(0,0,0,.22),rgba(0,0,0,.12)),
+  radial-gradient(circle at 10% 10%, rgba(59,130,246,.08), transparent 40%),
+  repeating-linear-gradient(0deg, rgba(200,220,255,.08) 0, rgba(200,220,255,.08) 1px, transparent 1px, transparent 24px),
+  repeating-linear-gradient(90deg, rgba(200,220,255,.08) 0, rgba(200,220,255,.08) 1px, transparent 1px, transparent 24px);
+box-shadow: inset 0 8px 24px -12px rgba(0,0,0,.8), inset 0 -10px 30px -18px rgba(0,0,0,.9), 0 1px 0 rgba(255,255,255,.025);
+overflow:hidden;display:flex;align-items:center;justify-content:center;}
+.floor-preview .hint{position:absolute;bottom:10px;left:12px;font-size:.48rem;color:#a7c9c9;opacity:.8;letter-spacing:.4px;}
+.floor-preview svg{width:100%;height:100%;max-width:100%;max-height:100%;filter:drop-shadow(0 2px 10px rgba(0,0,0,.5));}
+@media (max-width:800px){
+  .floor-ctr{display:none !important;}
+}
+/* Bottom-right dock (shows events/info normally; switches to floor carousel in floor modes) */
+.floor-full{display:block;position:fixed;left:auto;right:24px;bottom:24px;width:clamp(420px,32vw,540px);height:clamp(300px,38vh,460px);z-index:12;border:1px solid rgba(255,255,255,.1);border-radius:18px;padding:.8rem .85rem 1rem;background:rgba(10,16,26,.44);backdrop-filter:blur(18px) saturate(170%);-webkit-backdrop-filter:blur(18px) saturate(170%);box-shadow:0 16px 42px -18px rgba(0,0,0,.72),0 0 0 1px rgba(255,255,255,.05) inset;min-height:0;overflow:hidden;}
+/* Variant system: floor-full gains a modifier class when in radical layout */
+.floor-full.variant-v1{right:32px;bottom:32px;width:clamp(700px,54vw,1040px);height:clamp(420px,60vh,720px);padding:1rem 1.1rem 1.2rem;border-radius:26px;background:rgba(14,20,30,.55);box-shadow:0 28px 68px -26px rgba(0,0,0,.78),0 4px 22px -8px rgba(0,0,0,.55),0 0 0 1px rgba(255,255,255,.06) inset;display:flex;flex-direction:column;}
+.floor-full.variant-v1:before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 18% 22%,rgba(255,255,255,.12),transparent 60%),linear-gradient(135deg,rgba(255,255,255,.08),rgba(255,255,255,.02) 45%,transparent);mix-blend-mode:overlay;opacity:.35;pointer-events:none;}
+.floor-full.variant-v1 .dock-floor{display:flex !important;flex:1;}
+.floor-full.variant-v1 .floor-panel{flex-direction:row;gap:1.1rem;padding:.2rem;}
+.floor-full.variant-v1 .floor-upper{flex:1 1 65%;display:flex;flex-direction:column;overflow:hidden;position:relative;border:1px solid rgba(255,255,255,.08);border-radius:20px;background:rgba(8,14,22,.38);backdrop-filter:blur(18px) saturate(170%);-webkit-backdrop-filter:blur(18px) saturate(170%);box-shadow:inset 0 0 0 1px rgba(255,255,255,.04),0 8px 24px -12px rgba(0,0,0,.6);}
+.floor-full.variant-v1 .floor-preview-wrap{flex:1 1 auto;padding:.65rem .85rem .85rem;display:flex;}
+.floor-full.variant-v1 .floor-center{flex:1 1 auto;display:flex;}
+.floor-full.variant-v1 .floor-preview{margin:0;border-radius:16px;flex:1;height:100%;min-height:0;max-height:none;background:linear-gradient(180deg,rgba(0,0,0,.32),rgba(0,0,0,.18)),repeating-linear-gradient(0deg, rgba(200,220,255,.08) 0, rgba(200,220,255,.08) 1px, transparent 1px, transparent 22px),repeating-linear-gradient(90deg, rgba(200,220,255,.08) 0, rgba(200,220,255,.08) 1px, transparent 1px, transparent 22px);}
+.floor-full.variant-v1 .floor-preview svg{filter:drop-shadow(0 4px 22px rgba(0,0,0,.65));}
+.floor-full.variant-v1 .floor-info{flex:0 0 35%;display:flex;flex-direction:column;gap:.6rem;position:relative;border:1px solid rgba(255,255,255,.08);border-radius:20px;padding:1rem .95rem .95rem;background:rgba(10,18,28,.72);backdrop-filter:blur(14px) saturate(190%);-webkit-backdrop-filter:blur(14px) saturate(190%);box-shadow:inset 0 0 0 1px rgba(255,255,255,.06),0 10px 26px -14px rgba(0,0,0,.7);} 
+.floor-full.variant-v1 .floor-head{margin:0;}
+.floor-full.variant-v1 .floor-title{font-size:1rem;line-height:1.25;}
+.floor-full.variant-v1 .floor-price{font-size:.7rem;}
+.floor-full.variant-v1 .floor-desc{font-size:.65rem;margin:0;flex:1;overflow:auto;padding-right:.25rem;}
+.floor-full.variant-v1 .floor-desc::-webkit-scrollbar{width:6px;}
+.floor-full.variant-v1 .floor-desc::-webkit-scrollbar-thumb{background:rgba(255,255,255,.12);border-radius:3px;}
+.floor-full.variant-v1 .floor-bottom-bar{position:absolute;inset:auto auto 1rem 1rem;right:1rem;display:flex;gap:.65rem;justify-content:space-between;background:rgba(0,0,0,.25);backdrop-filter:blur(8px) saturate(180%);-webkit-backdrop-filter:blur(8px) saturate(180%);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:.55rem .7rem;width:auto;box-shadow:0 8px 26px -14px rgba(0,0,0,.55),0 0 0 1px rgba(255,255,255,.05) inset;}
+.floor-full.variant-v1 .floor-bottom-bar .floor-btn{font-size:.6rem;padding:.55rem .8rem;border-radius:10px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.18);}
+.floor-full.variant-v1 .floor-bottom-bar .floor-btn:hover{background:rgba(255,255,255,.18);} 
+.floor-full.variant-v1 .floor-bottom-bar #exitFloor{order:2;font-size:.62rem;font-weight:800;background:linear-gradient(180deg,#2563eb,#1e3a8a);color:#e8f2ff;border:1px solid rgba(59,130,246,.55);box-shadow:0 6px 22px -10px rgba(30,64,175,.55),0 0 0 1px rgba(59,130,246,.25) inset;}
+.floor-full.variant-v1 .floor-bottom-bar #prevLayout{order:1;}
+.floor-full.variant-v1 .floor-bottom-bar #nextLayout{order:3;}
+.floor-full.variant-v1 .floor-bottom-bar button{min-width:84px;}
+.floor-full.variant-v1 .floor-preview .hint{font-size:.55rem;}
 
-    .topbar{
-      display:flex; align-items:center; gap:12px;
-      pointer-events:auto;
-      align-self:flex-start;
-      backdrop-filter: blur(var(--blur));
-      -webkit-backdrop-filter: blur(var(--blur));
-      background: var(--panel);
-      border: 1px solid rgba(255,255,255,0.09);
-      border-radius: 999px;
-      padding: 8px 12px;
-      box-shadow: var(--shadow);
-    }
-    .brand-dot{ width:10px; height:10px; border-radius:999px; background:linear-gradient(90deg,var(--brand),var(--brand-2)); }
-    .title{ font-weight:600; letter-spacing:.2px; font-size:14px; color:var(--muted); }
-    .sp{ flex:1; }
+/* Slightly dim non-active UI while in variant to emphasize planner */
+body.variant-floor-v1 #ui{opacity:.55;transition:opacity .4s ease;}
+body.variant-floor-v1 #ui:hover{opacity:.85;}
 
-    .controls{
-      pointer-events:auto;
-      display:flex; flex-direction:column; gap:16px;
-      align-items:center; justify-content:center;
-      margin-bottom: 6vh;
-    }
+/* ================= Variant V2: Slim vertical blueprint + radial controls ================ */
+.floor-full.variant-v2{right:30px;bottom:30px;width:clamp(480px,40vw,760px);height:clamp(500px,70vh,860px);padding:0;border-radius:34px;display:flex;flex-direction:row;overflow:hidden;background:rgba(8,14,22,.55);backdrop-filter:blur(34px) saturate(200%);-webkit-backdrop-filter:blur(34px) saturate(200%);box-shadow:0 40px 80px -34px rgba(0,0,0,.85),0 0 0 1px rgba(255,255,255,.08) inset;}
+.floor-full.variant-v2:before{content:"";position:absolute;inset:0;background:linear-gradient(145deg,rgba(255,255,255,.12),rgba(255,255,255,.02) 50%,transparent);mix-blend-mode:overlay;pointer-events:none;opacity:.35;}
+.floor-full.variant-v2 .floor-panel{flex:1;display:flex;flex-direction:row;gap:0;padding:0;}
+.floor-full.variant-v2 .floor-upper{flex:0 0 46%;display:flex;align-items:stretch;justify-content:flex-start;background:#050a11; position:relative;}
+.floor-full.variant-v2 .floor-preview-wrap{flex:1;display:flex;padding:1.1rem .95rem;background:repeating-linear-gradient(0deg,rgba(255,255,255,.04) 0,rgba(255,255,255,.04) 1px,transparent 1px,transparent 28px),repeating-linear-gradient(90deg,rgba(255,255,255,.04) 0,rgba(255,255,255,.04) 1px,transparent 1px,transparent 28px);}
+.floor-full.variant-v2 .floor-preview{margin:0;border:0;border-radius:22px;background:radial-gradient(circle at 60% 40%, rgba(59,130,246,.18), transparent 60%),linear-gradient(180deg,rgba(0,0,0,.5),rgba(0,0,0,.25));height:100%;}
+.floor-full.variant-v2 .floor-preview svg{filter:drop-shadow(0 10px 28px rgba(0,0,0,.65));}
+.floor-full.variant-v2 .floor-info{flex:1;display:flex;flex-direction:column;padding:1.2rem 1rem 1.4rem 1.3rem;position:relative;}
+.floor-full.variant-v2 .floor-head{margin-bottom:.4rem;}
+.floor-full.variant-v2 .floor-title{font-size:1.05rem;line-height:1.25;}
+.floor-full.variant-v2 .floor-desc{font-size:.64rem;line-height:1.4;margin-top:.4rem;flex:1;overflow:auto;padding-right:.4rem;}
+.floor-full.variant-v2 .floor-desc::-webkit-scrollbar{width:6px;} 
+.floor-full.variant-v2 .floor-desc::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:3px;}
+.floor-full.variant-v2 .floor-bottom-bar{all:unset;display:flex;flex-direction:column;position:absolute;top:50%;left:calc(46% - 34px);transform:translate(-50%,-50%);gap:18px;}
+.floor-full.variant-v2 .radial-btn{width:68px;height:68px;border-radius:50%;border:1px solid rgba(255,255,255,.15);background:linear-gradient(180deg,rgba(255,255,255,.15),rgba(255,255,255,.05));backdrop-filter:blur(20px) saturate(200%);-webkit-backdrop-filter:blur(20px) saturate(200%);display:flex;align-items:center;justify-content:center;font-size:.6rem;font-weight:700;letter-spacing:.5px;color:#fff;cursor:pointer;position:relative;box-shadow:0 12px 28px -14px rgba(0,0,0,.7),0 0 0 1px rgba(255,255,255,.06) inset;transition:transform .3s,background .3s,border-color .3s;} 
+.floor-full.variant-v2 .radial-btn:hover{transform:translateY(-4px);background:linear-gradient(180deg,rgba(255,255,255,.22),rgba(255,255,255,.07));}
+.floor-full.variant-v2 .radial-btn:active{transform:translateY(-1px);} 
+.floor-full.variant-v2 .radial-btn[data-role="exit"]{background:linear-gradient(180deg,#2563eb,#1e3a8a);border-color:rgba(59,130,246,.55);}
+.floor-full.variant-v2 .radial-btn[data-role="exit"]:hover{filter:brightness(1.05);} 
+.floor-full.variant-v2 .radial-btn-label{position:absolute;bottom:-14px;font-size:.45rem;letter-spacing:.35px;font-weight:600;opacity:.8;text-transform:uppercase;}
+body.variant-floor-variant-v2 #ui{opacity:.5;}
 
-    /* Segmented destination group */
-    .segmented{
-      display:flex; gap:10px; flex-wrap:wrap; justify-content:center;
-    }
-    .segmented .btn{
-      --ring: 0 0 0 0 rgba(0,255,167,0);
-      position:relative;
-      appearance:none;
-      border:none;
-      padding:14px 18px;
-      border-radius: 14px;
-      background: linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.03));
-      color: var(--text);
-      box-shadow: var(--shadow), var(--ring);
-      cursor:pointer;
-      font-weight:600; letter-spacing:.2px;
-      display:inline-flex; align-items:center; gap:10px;
-      transition: transform .12s ease, background .2s ease, box-shadow .2s ease, opacity .2s ease;
-    }
-    .segmented .btn:hover{ transform: translateY(-1px); }
-    .segmented .btn:active{ transform: translateY(0); }
-    .segmented .btn[disabled]{ opacity:.6; cursor:not-allowed; }
-    .segmented .btn svg{ width:18px; height:18px; opacity:.9; }
+/* Hide original bottom bar buttons in variant v2 */
+.floor-full.variant-v2 .floor-bottom-bar button{display:none;}
 
-    .btn.secondary{
-      background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.02));
-      color: var(--muted);
-      font-weight:600;
-    }
-    .btn.primary{
-      background: linear-gradient(180deg, rgba(0,255,167,.25), rgba(0,255,167,.12));
-      color:#041a13;
-      text-shadow: 0 1px 0 rgba(255,255,255,.2);
-    }
-    .btn.active, .btn[aria-current="true"]{
-      outline:2px solid rgba(0,255,167,.6);
-      outline-offset:2px;
-      box-shadow: var(--shadow), 0 0 0 6px rgba(0,255,167,.12) inset;
-      background: linear-gradient(180deg, rgba(0,255,167,.32), rgba(0,255,167,.16));
-    }
-    .btn:focus-visible{
-      outline:2px solid #00ff94;
-      outline-offset:2px;
-    }
+/* ================= Variant V3: Compact fixed-size panel ================= */
+.floor-full.variant-v3{right:24px;bottom:24px;width:420px;height:320px;padding:.75rem .75rem .85rem;border-radius:18px;background:rgba(14,20,30,.55);backdrop-filter:blur(18px) saturate(180%);-webkit-backdrop-filter:blur(18px) saturate(180%);box-shadow:0 18px 48px -20px rgba(0,0,0,.8),0 0 0 1px rgba(255,255,255,.06) inset;display:flex;flex-direction:column;overflow:hidden;}
+.floor-full.variant-v3 .floor-panel{display:flex;flex-direction:column;gap:.55rem;height:100%;}
+.floor-full.variant-v3 .floor-upper{display:flex;flex-direction:row;gap:.65rem;flex:1;min-height:0;}
+.floor-full.variant-v3 .floor-preview-wrap{flex:0 0 52%;display:flex;}
+.floor-full.variant-v3 .floor-preview{margin:0;border-radius:12px;flex:1;min-height:0;height:100%;background:linear-gradient(180deg,rgba(0,0,0,.35),rgba(0,0,0,.2)),repeating-linear-gradient(0deg,rgba(255,255,255,.05) 0,rgba(255,255,255,.05) 1px,transparent 1px,transparent 24px),repeating-linear-gradient(90deg,rgba(255,255,255,.05) 0,rgba(255,255,255,.05) 1px,transparent 1px,transparent 24px);} 
+.floor-full.variant-v3 .floor-preview svg{filter:drop-shadow(0 3px 14px rgba(0,0,0,.6));}
+.floor-full.variant-v3 .floor-info{flex:1;display:flex;flex-direction:column;min-width:0;}
+.floor-full.variant-v3 .floor-head{display:flex;align-items:flex-start;justify-content:space-between;margin:0 0 .35rem;gap:.5rem;}
+.floor-full.variant-v3 .floor-title{font-size:.72rem;line-height:1.2;font-weight:700;max-height:calc(2 * 1.2em);overflow:hidden;}
+.floor-full.variant-v3 .floor-price{font-size:.55rem;padding:.25rem .5rem;}
+.floor-full.variant-v3 .floor-desc{font-size:.55rem;line-height:1.28;letter-spacing:.25px;flex:1;overflow:hidden;display:-webkit-box;-webkit-line-clamp:5;line-clamp:5;-webkit-box-orient:vertical;}
+.floor-full.variant-v3 .floor-bottom-bar{position:relative;inset:auto;display:flex;align-items:center;justify-content:space-between;gap:.4rem;margin-top:.2rem;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);padding:.4rem .5rem;border-radius:10px;box-shadow:0 4px 18px -10px rgba(0,0,0,.6),0 0 0 1px rgba(255,255,255,.05) inset;}
+.floor-full.variant-v3 .floor-btn{padding:.4rem .6rem;font-size:.55rem;border-radius:8px;background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.14);}
+.floor-full.variant-v3 .floor-btn:hover{background:rgba(255,255,255,.14);} 
+.floor-full.variant-v3 #exitFloor{flex:1;font-size:.55rem;margin:0 .25rem;background:linear-gradient(180deg,#3b82f6,#1d4ed8);color:#0c1220;border:1px solid rgba(59,130,246,.55);} 
+.floor-full.variant-v3 #exitFloor:hover{filter:brightness(1.05);} 
+body.variant-floor-v3 #ui{opacity:.9;} /* minimal dimming */
 
-    /* Utility bar */
-    .utility{
-      display:flex; gap:10px; flex-wrap:wrap; justify-content:center;
-    }
 
-    /* Status (debug-only by default) */
-    .status{
-      pointer-events:auto;
-      align-self:flex-end;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
-      font-size:12px; color:var(--muted);
-      max-width: min(50vw, 520px);
-      white-space:pre-wrap;
-      backdrop-filter: blur(var(--blur)); -webkit-backdrop-filter: blur(var(--blur));
-      background: var(--panel);
-      border: 1px solid rgba(255,255,255,0.09);
-      border-radius: var(--radius);
-      padding: 10px 12px;
-      box-shadow: var(--shadow);
-      display:none; /* hidden unless debug */
-    }
+/* Dock panes */
+.dock-info{position:relative;display:flex;gap:.75rem;align-items:stretch;height:100%;padding-bottom:3.2rem;}
+.dock-hero{flex:0 0 40%;min-width:150px;border-radius:10px;background:#111a28 url('https://picsum.photos/seed/event/600/400') center/cover no-repeat;border:1px solid rgba(255,255,255,.06);box-shadow:inset 0 0 0 1px rgba(255,255,255,.02);} 
+.dock-body{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;justify-content:space-between;padding:.1rem .1rem;}
+.dock-title{font-weight:700;letter-spacing:.15px;font-size:1rem;color:#fff;margin-bottom:.1rem;line-height:1.25;}
+.dock-sub{color:#bcd0e6;font-size:.66rem;margin:.15rem 0 .35rem;}
+.dock-text{color:#cfe3e6;font-size:.6rem;line-height:1.32;}
+.dock-cta{display:none;}
+.dock-cta-bar{position:absolute;left:.6rem;right:.6rem;bottom:.6rem;height:42px;border-radius:10px;background:#f3e4d6;color:#1b1b1b;font-weight:800;letter-spacing:.3px;display:flex;align-items:center;justify-content:center;border:1px solid rgba(0,0,0,.08);box-shadow:0 8px 22px -14px rgba(0,0,0,.6), inset 0 0 0 1px rgba(255,255,255,.12);cursor:pointer;}
+.dock-cta-bar:hover{filter:brightness(1.03);}
+.dock-floor{display:none;height:100%;pointer-events:auto;}
+.floor-grid{display:flex;flex-direction:column;gap:.75rem;align-items:stretch;height:100%;}
+.floor-rail{display:none;}
+.floor-rail .floor-dots{flex:1;display:flex;flex-direction:column;gap:.35rem;align-items:center;justify-content:flex-start;}
+.floor-rail .floor-dot{width:9px;height:9px;border-radius:50%;background:rgba(255,255,255,.25);} 
+.floor-rail .floor-dot.active{background:var(--accent);box-shadow:0 0 6px rgba(59,130,246,.5);} 
+.floor-center{min-width:0;display:flex;align-items:center;justify-content:center;}
+.floor-center .floor-preview{height:180px;width:100%;}
+.floor-info{display:flex;flex-direction:column;gap:.55rem;min-width:0;}
+.floor-info .floor-head{margin-bottom:.15rem;}
+.floor-info .floor-actions{justify-content:space-between;}
+.btn{position:relative;width:100%;background:rgba(255,255,255,0);border:0;color:#9aaac0;padding:.32rem .45rem .36rem .7rem;display:flex;flex-direction:row;align-items:center;justify-content:flex-start;gap:.72rem;font-size:.95rem;font-weight:600;letter-spacing:.005rem;cursor:pointer;outline:none;transition:color .2s,transform .16s,font-size .28s ease,text-shadow .2s, background .3s, box-shadow .3s; text-shadow:0 1px 2px rgba(0,0,0,.4);border-radius:12px;} 
+.btn:before{content:none !important;display:none !important;}
+.btn:hover{color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.45);} 
+.btn:active{transform:translateY(1px);}
+.btn[disabled]{opacity:.35;pointer-events:none;}
+.btn.active{color:#fff;font-size:2.05rem;font-weight:850;letter-spacing:.016rem;background:transparent;box-shadow:none;text-shadow:0 4px 16px rgba(0,0,0,.85);} 
+.btn.active{margin-top:.7rem;margin-bottom:.45rem;}
+/* Removed hover/active dot visuals */
+/* Floor exit synthetic button styling */
+.btn.floor-exit-active{color:#fff !important;font-size:2.3rem !important;font-weight:900 !important;letter-spacing:.02rem !important;text-shadow:0 5px 18px rgba(0,0,0,.9),0 0 26px rgba(245,158,11,.45);} 
+.btn.floor-exit-active:before{opacity:1;transform:scale(1.3);background:var(--accent) !important;box-shadow:0 0 0 10px rgba(59,130,246,.25),0 0 14px 4px rgba(59,130,246,.45);} 
+/* Simplified inline floor plan action */
+.inline-floor-panel{position:relative;margin:-.15rem 0 .55rem .55rem;padding:.15rem 0 .15rem .55rem;border-left:2px solid var(--accent);font-size:.62rem;letter-spacing:.4px;color:#d5e8ff;font-weight:600;display:inline-flex;gap:.5rem;align-items:center;cursor:pointer;user-select:none;}
+.inline-floor-panel button{all:unset;cursor:pointer;color:inherit;font:inherit;display:inline-flex;align-items:center;gap:.4rem;}
+.inline-floor-panel button:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px;}
+.inline-floor-panel:hover{color:#fff;}
+/* Floor mode navigation dimming */
+body.floor-config-active #ui .btn{opacity:.02;pointer-events:none;transition:opacity .35s ease;}
+body.floor-config-active #ui .btn.active{opacity:1;pointer-events:auto;}
+body.floor-config-active #ui .inline-floor-panel{opacity:1;pointer-events:auto;}
+body.floor-config-active #ui .inline-floor-panel.exit-inline button{color:#8ec3ff;}
+body.floor-config-active #ui .inline-floor-panel.exit-inline button:hover{color:#fff;}
+/* Configurator label inside panel */
+.floor-config-label{position:absolute;top:6px;left:10px;font-size:.5rem;letter-spacing:.28rem;text-transform:uppercase;color:#b9dcff;opacity:.85;font-weight:700;pointer-events:none;}
+.btn-inner{display:flex;flex-direction:row;align-items:center;justify-content:flex-start;gap:.6rem;padding:.05rem .25rem;width:100%;}
+.btn-icon{display:none;}
+.btn-label{font-size:inherit;text-transform:none;letter-spacing:.01rem;font-weight:inherit;line-height:1.25;text-align:left;white-space:normal;max-width:100%;display:block;}
 
-    /* Toast */
-    .toast{
-      position:fixed; left:50%; bottom: max(24px, env(safe-area-inset-bottom));
-      transform: translateX(-50%);
-      padding:10px 14px;
-      background: rgba(20,25,35,.9);
-      color: var(--text);
-      border: 1px solid rgba(255,255,255,0.08);
-      border-radius: 999px;
-      font-size:13px;
-      display:none;
-    }
+/* Status area as floating pill (bottom-right of banner) ----------------------- */
+.status{position:absolute;bottom:8px;right:10px;font-size:.5rem;background:rgba(255,255,255,.03); /* slightly more transparent */ padding:.35rem .5rem;border:1px solid rgba(255,255,255,.1);border-radius:10px;letter-spacing:.5px;z-index:9;display:flex;align-items:center;gap:.5rem;backdrop-filter:blur(16px) saturate(185%);-webkit-backdrop-filter:blur(16px) saturate(185%);box-shadow:0 2px 6px -2px rgba(0,0,0,.55),0 0 0 1px rgba(255,255,255,.035) inset;}
+.status button{background:#182428;color:#eee;border:1px solid #314349;font-size:.55rem;padding:.35rem .65rem;border-radius:8px;cursor:pointer;letter-spacing:.5px;font-weight:600;transition:background .4s,border-color .4s,color .4s;}
+.status button:hover{background:#3b82f6;color:#0b1220;border-color:#3b82f6;}
 
-    /* Small screens */
-    @media (max-width: 640px){
-      .title{ display:none; }
-    }
-  </style>
+/* Mobile fallback (retain original bottom bar style) ------------------------- */
+@media (max-width:800px){
+  /* Mobile: bottom app bar layout */
+  #stage{padding-left:0;padding-bottom:var(--banner-h);} 
+  #panel{left:0;right:0;bottom:0;top:auto;width:100%;height:var(--banner-h);min-height:var(--banner-h);max-height:var(--banner-h);padding:.4rem .35rem .5rem;background:rgba(10,16,28,.7);box-shadow:0 -8px 24px -18px rgba(0,0,0,.85);} 
+  .panel-header{display:none;}
+  .panel-state{display:none;}
+  .banner-head{display:none;}
+  .banner-content{display:block;}
+  #ui{flex-direction:row;overflow-x:auto;overflow-y:hidden;gap:0;padding:0;margin:0;}
+  .btn{height:54px;min-width:112px;border-radius:0;border-left:1px solid rgba(255,255,255,.06);border-right:1px solid rgba(255,255,255,.06);background:rgba(255,255,255,.025);} 
+  .btn:first-child{border-left:0;}
+  .btn:last-child{border-right:0;}
+  .btn-inner{padding:.55rem .55rem;flex-direction:column;gap:.4rem;align-items:center;justify-content:center;}
+  .btn-icon{width:34px;height:34px;border-radius:8px;}
+  .btn-label{text-align:center;font-size:.48rem;}
+  .status{display:none;}
+}
+
+/* Time/Date HUD (bottom-left, minimal) */
+.hud-clock{position:fixed;left:18px;bottom:52px;z-index:8;min-width:200px;max-width:38vw;border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:.55rem .7rem .6rem;background:rgba(12,16,24,.32);backdrop-filter:blur(10px) saturate(160%);-webkit-backdrop-filter:blur(10px) saturate(160%);box-shadow:0 14px 28px -16px rgba(0,0,0,.65),0 0 0 1px rgba(255,255,255,.03) inset;color:#e9f0fb;display:flex;flex-direction:column;align-items:flex-start;gap:.4rem;}
+.hud-top{display:flex;align-items:baseline;gap:.6rem;justify-content:flex-start;}
+.hud-time{font-size:1.2rem;font-weight:700;letter-spacing:.2px;}
+.hud-date{font-size:.7rem;color:#bcd0e6;letter-spacing:.38px;opacity:.95;}
+/* Weather row */
+.hud-weather{display:flex;align-items:center;gap:.5rem;font-size:.62rem;letter-spacing:.4px;color:#cfe3f6;margin-top:.1rem;}
+.hud-weather-icon{width:26px;height:26px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:.8rem;background:linear-gradient(145deg,rgba(255,255,255,.18),rgba(255,255,255,.05));box-shadow:0 4px 14px -8px rgba(0,0,0,.6),0 0 0 1px rgba(255,255,255,.06) inset;backdrop-filter:blur(6px) saturate(180%);-webkit-backdrop-filter:blur(6px) saturate(180%);}
+.hud-weather-temp{font-weight:700;color:#fff;font-size:.64rem;}
+.hud-weather-cond{opacity:.9;}
+@media (max-width:800px){ .hud-weather{display:none;} }
+@media (max-width:800px){ .hud-clock{display:none;} }
+
+/* Mobile "app bar" layout */
+@media (max-width:800px){
+  #ui{position:fixed;bottom:0;left:0;right:0;transform:none;flex-direction:row;justify-content:center;align-items:stretch;padding:0;background:#000;border:0;border-top:1px solid #111a1d;border-radius:0;box-shadow:0 -2px 12px -4px rgba(0,0,0,.85);gap:0;}
+  .btn{width:112px;height:54px;background:rgba(255,255,255,.045);border-right:1px solid #1d2a2f;}
+  .btn:last-child{border-right:0;}
+  .btn-inner{gap:.5rem;padding:0 .5rem;}
+  .btn-icon{width:28px;height:28px;border-radius:4px;}
+  .btn-label{max-width:64%;font-size:.46rem;}
+  body.has-notch #ui{padding-bottom:.4rem;} /* optional safe area tweak */
+  body.mobile-contain video{object-fit:contain !important;--mob-zoom:1.12;transform:scale(var(--mob-zoom));transform-origin:center center;will-change:transform;}
+  body.mobile-contain #stage{background:#000;}
+}
+
+/* Ultra-small screens fallback */
+@media (max-width:420px){
+  .btn{width:96px;height:48px;}
+  .btn-icon{width:24px;height:24px;}
+  .btn-label{font-size:.4rem;max-width:60%;}
+}
+/* (Old horizontal bar styles removed / replaced above) */
+.badge{background:#f3e4d6;color:#1b1b1b;font-weight:700;font-size:.55rem;padding:.2rem .45rem;border-radius:999px;margin-left:.45rem;}
+/* Crossfade for instant (no transition file) switches */
+#active.crossfade-enter{opacity:0;transition:opacity .4s ease;}
+#active.crossfade-enter.crossfade-show{opacity:1;}
+/* (footer removed; status now floats bottom-right) */
+
+/* ---------- Info panel styles (banner-right) ---------- */
+.info-panel{display:none;}
+
+/* Bottom-right event popup card (reference style) */
+.event-popup{position:fixed;right:24px;bottom:24px;z-index:8;display:flex;gap:0;align-items:stretch;width:clamp(320px, 24vw, 420px);min-height:clamp(320px, 24vw, 420px);aspect-ratio:1/1;border-radius:14px;background:rgba(12,16,24,.9);border:1px solid rgba(255,255,255,.08);box-shadow:0 18px 42px -18px rgba(0,0,0,.7), 0 0 0 1px rgba(255,255,255,.03) inset;padding:.6rem .6rem 2.8rem .6rem;overflow:hidden;}
+@media (max-height:700px){
+  .event-popup{aspect-ratio:auto;min-height:clamp(300px, 38vh, 360px);} /* fallback on short viewports */
+}
+.event-hero{position:relative;flex:0 0 50%;min-width:50%;height:100%;border-radius:10px;background:#111a28 center/cover no-repeat;border:0;overflow:hidden;background-image:url('https://picsum.photos/seed/cc-coffee/800/1000');} 
+.event-hero::after{content:"";position:absolute;top:0;right:0;width:clamp(60px, 18%, 140px);height:100%;pointer-events:none;background:linear-gradient(90deg, rgba(12,16,24,0) 0%, rgba(12,16,24,0.5) 55%, rgba(12,16,24,0.9) 100%);} 
+.event-body{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:.35rem;padding-left:.8rem;}
+.event-title{font-weight:700;font-size:1rem;color:#fff;letter-spacing:.14px;line-height:1.25;}
+.event-tag{align-self:flex-start;background:var(--accent-soft);color:#d6e9ff;border:1px solid var(--accent-soft-border);font-size:.62rem;font-weight:700;letter-spacing:.3px;padding:.18rem .5rem;border-radius:999px;}
+.event-meta{display:flex;flex-wrap:wrap;gap:.5rem;color:#bcd0e6;font-size:.66rem;}
+.event-desc{color:#cfe3e6;font-size:.6rem;line-height:1.34;}
+.event-cta{position:absolute;left:.6rem;right:.6rem;bottom:.6rem;height:42px;border-radius:10px;background:#f3e4d6;color:#1b1b1b;font-weight:800;letter-spacing:.3px;display:flex;align-items:center;justify-content:center;border:1px solid rgba(0,0,0,.08);box-shadow:0 8px 22px -14px rgba(0,0,0,.6), inset 0 0 0 1px rgba(255,255,255,.12);cursor:pointer;}
+.event-cta:hover{filter:brightness(1.03);} 
+
+/* Right-side tool rail (floating circular controls) */
+.tool-rail{position:fixed;right:24px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:10px;z-index:8;}
+.tool-btn{width:46px;height:46px;border-radius:50%;background:rgba(12,16,24,.6);border:1px solid rgba(255,255,255,.06);color:#e7eef8;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 8px 22px -14px rgba(0,0,0,.6),0 0 0 1px rgba(255,255,255,.02) inset;}
+.tool-btn:hover{background:rgba(12,16,24,.72);}
+.tool-btn:active{transform:translateY(1px);} 
+.tool-btn:focus{outline:2px solid rgba(245,158,11,.6);} 
+</style>
 </head>
 <body>
-  <div id="stage" aria-live="polite" aria-label="Interactive display video stage">
-    <!-- triple-buffer videos -->
-    <video id="vidA" class="display" playsinline webkit-playsinline muted preload="auto"></video>
-    <video id="vidB" class="display hidden" playsinline webkit-playsinline muted preload="auto"></video>
-    <video id="vidBuf" class="display hidden" playsinline webkit-playsinline muted preload="auto"></video>
-  </div>
-
-  <div id="ui" role="region" aria-label="Interface controls">
-    <div class="topbar">
-      <div class="brand-dot" aria-hidden="true"></div>
-      <div class="title">Putnam County Convention &amp; Expo — House of KnA · PIXL</div>
+<header>Convention Center Navigator <span class="badge">Beta</span></header>
+<div id="stage">
+  <video id="active" playsinline muted></video>
+  <video id="next" playsinline muted></video>
+  <video id="buffer" playsinline muted></video>
+  <div class="stage-overlay" aria-hidden="true"></div>
+  <div id="panel">
+    <div class="panel-header">Navigation</div>
+    <div class="banner-head">
+      <div id="stateTitle" class="panel-state">Loading...</div>
     </div>
-
-    <div class="controls">
-      <div id="destinations" class="segmented" role="group" aria-label="Destinations"></div>
-      <div class="utility">
-        <button class="btn secondary" id="btnContain" aria-pressed="false" title="Toggle contain / cover">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M9 9h6v6H9z"/></svg>
-          Fit
-        </button>
-        <button class="btn secondary" id="btnReset" title="Reset to main menu">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 3v6h6"/></svg>
-          Reset
-        </button>
-        <button class="btn secondary" id="btnMute" aria-pressed="true" title="Toggle sound">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M4 10v4h4l5 4V6l-5 4z"/><path d="M16 9a5 5 0 0 1 0 6"/><path d="M19 7a9 9 0 0 1 0 10"/></svg>
-          Mute
-        </button>
+    <div class="banner-content">
+      <div class="banner-left">
+        <div class="ui-scrim" aria-hidden="true"></div>
+        <div class="ui-label">Navigate</div>
+        <div class="ui-sep"></div>
+        <div id="ui"></div>
+        <div class="ui-sep"></div>
+      </div>
+      <div class="banner-right">
+        <div id="infoPanel" class="info-panel" aria-live="polite">
+          <div class="info-hero" id="infoHero" role="img" aria-label="Upcoming event hero image"></div>
+          <div class="info-body">
+            <div class="info-title">Upcoming: Citywide Home & Garden Expo</div>
+            <div class="info-sub">June 12–14 • Convention Center Halls A–C • Presented by City Events</div>
+            <div class="info-text">Discover the latest in home improvement, landscaping, and smart living. Explore booths from top vendors, attend expert workshops, and preview our new floor plan layouts. Early-bird registration ends soon—book your space now to secure preferred placement.</div>
+          </div>
+        </div>
+  </div>
+  <!-- Bottom-right dock: events/info default; floor carousel in floor modes -->
+  <div id="floorOptions" class="floor-full" aria-live="polite">
+    <div class="dock-info" id="dockInfo">
+      <div class="dock-hero" id="dockHero" role="img" aria-label="Upcoming event hero image"></div>
+      <div class="dock-body">
+        <div>
+          <div class="dock-title" id="dockTitle">Upcoming: Citywide Home & Garden Expo</div>
+          <div class="dock-sub" id="dockSub">June 12–14 • Convention Center Halls A–C • Presented by City Events</div>
+          <div class="dock-text" id="dockText">Discover the latest in home improvement, landscaping, and smart living. Explore booths from top vendors and attend expert workshops. Early-bird registration ends soon—book your space now.</div>
+        </div>
+        <div class="dock-cta">
+          <button class="floor-btn" type="button" onclick="go('overview')">View Details</button>
+        </div>
+      </div>
+      <button class="dock-cta-bar" type="button" onclick="go('overview')">GET MORE INFORMATION</button>
+    </div>
+    <div class="dock-floor" id="dockFloor">
+      <div class="floor-panel">
+        <div class="floor-config-label">FLOOR PLAN CONFIGURATOR</div>
+        <div class="floor-upper">
+          <div class="floor-preview-wrap">
+            <div class="floor-center">
+              <div class="floor-preview" id="floorPreview"><div class="hint">Preview</div></div>
+            </div>
+          </div>
+          <div class="floor-info">
+            <div class="floor-head">
+              <div class="floor-title" id="floorTitle">Loading layout…</div>
+              <div class="floor-price" id="floorPrice">$0/day</div>
+            </div>
+            <div class="floor-desc" id="floorDesc">Choose a layout preset for this room. Pricing shown is per day and illustrative.</div>
+          </div>
+        </div>
+        <div class="floor-bottom-bar">
+          <button class="floor-btn" id="prevLayout" type="button">‹ Prev</button>
+          <button class="floor-exit" id="exitFloor" type="button">Exit Floor Plan View</button>
+          <button class="floor-btn" id="nextLayout" type="button">Next ›</button>
+        </div>
       </div>
     </div>
-
-    <pre id="status" class="status" aria-live="polite"></pre>
   </div>
+      
+    </div>
+  <div class="status" id="status"><span id="statusText">Loading...</span></div>
+    <!-- Minimal Time/Date HUD (bottom-left) -->
+    <div id="hudClock" class="hud-clock" aria-live="polite">
+      <div class="hud-weather" id="hudWeather" aria-label="Current weather loading">
+        <div class="hud-weather-icon" id="hudWeatherIcon" aria-hidden="true">…</div>
+        <div class="hud-weather-temp" id="hudWeatherTemp">--°</div>
+        <div class="hud-weather-cond" id="hudWeatherCond">Loading</div>
+      </div>
+      <div class="hud-top">
+        <div class="hud-time" id="hudTime">--:--</div>
+        <div class="hud-date" id="hudDate">—</div>
+      </div>
+    </div>
+  </div>
+  <!-- Event Popup (bottom-right) with slideshow -->
+  <div id="eventPopup" class="event-popup" aria-live="polite" role="dialog" aria-label="Event information">
+    <div class="event-hero" id="eventHero" aria-hidden="true"></div>
+    <div class="event-body">
+      <div class="event-tag" id="eventTag">Convention Center</div>
+      <div class="event-title" id="eventTitle">Saints Dark Coffee</div>
+      <div class="event-meta">
+        <span id="eventDistance">110 m</span>
+        <span id="eventHours">9:00–5:00</span>
+        <span id="eventSpot">Booth A127</span>
+      </div>
+      <div class="event-desc" id="eventDesc">Small-batch roastery pop-up featuring limited origin espresso and seasonal pastries. Visit us on the main concourse.</div>
+    </div>
+    <button class="event-cta" type="button" onclick="go('overview')">GET MORE INFORMATION</button>
+  </div>
+</div>
+<!-- Right-side tool rail -->
+<div class="tool-rail" id="toolRail" aria-label="Quick controls">
+  <button class="tool-btn" id="btnFullscreen" title="Fullscreen" aria-label="Fullscreen">⛶</button>
+  <button class="tool-btn" id="btnReset" title="Reset" aria-label="Reset">⎋</button>
+</div>
+<footer>© 2025 PIXL</footer>
+<script>
+// Base folder containing all MP4 assets. Using absolute root path with encoded spaces.
+// If serving from a subdirectory or locally, you can switch to a relative path like: const base = '../../Convention Center Videos/';
+const base = '/Convention%20Center%20Videos/';
 
-  <div id="toast" class="toast" role="status"></div>
+// -------------------------------------------------------------
+// Performance / adaptive enhancements (progressive introduction)
+// - Adaptive loop quality selection (high/med/low) using Network Info API
+// - Poster frame naming convention: originalName_preview.jpg (optional)
+// - Conservative eager preloading (limit count) + idle preload fallback
+// - Service Worker registration (cache loops + SWR for transitions)
+// Notes:
+//   * If variant or poster files are missing, code falls back silently to original loop.
+//   * Only loop clips get quality variants; transition clips stay single-source.
+// -------------------------------------------------------------
+const QUALITY_VARIANTS = ['high','med','low'];
+const loopVariantCache = new Map(); // original loop filename -> resolved (maybe variant)
+let pickedQuality = null;
 
-  <script>
-  // -----------------------------
-  // CONFIG — filenames remain EXACTLY as-is
-  // -----------------------------
-  const base = "Convention Center Videos/"; // trailing slash
-  const STATES = {
-    menu: {
-      label: "Main Menu",
-      loop: "menu_loop.mp4",
-      to: {
-        convention: { transition: "menu_to_convention.mp4" },
-        expo:       { transition: "menu_to_expo.mp4" }
+function pickInitialQuality(){
+  if(pickedQuality) return pickedQuality;
+  try{
+    const c = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+    if(c){
+      if(c.saveData) return pickedQuality='low';
+      // effectiveType: slow-2g, 2g, 3g, 4g (or beyond)
+      switch(c.effectiveType){
+        case 'slow-2g': case '2g': return pickedQuality='low';
+        case '3g': return pickedQuality='med';
       }
-    },
-    convention: {
-      label: "Convention Center",
-      loop: "convention_loop.mp4",
-      to: {
-        menu: { transition: "convention_to_menu.mp4" },
-        expo: { transition: "convention_to_expo.mp4" }
-      }
-    },
-    expo: {
-      label: "Expo Center",
-      loop: "expo_loop.mp4",
-      to: {
-        menu: { transition: "expo_to_menu.mp4" },
-        convention: { transition: "expo_to_convention.mp4" }
-      }
+      // Downlink in Mbps heuristic
+      if(c.downlink && c.downlink < 3) return pickedQuality='med';
+      if(c.downlink && c.downlink < 1.2) return pickedQuality='low';
     }
+  }catch(e){}
+  return pickedQuality='high';
+}
+
+async function resolveLoopFilename(original){
+  if(loopVariantCache.has(original)) return loopVariantCache.get(original);
+  const q = pickInitialQuality();
+  // Don't attempt variant for very short intro to keep quick start (keep original if intro.mp4)
+  if(original === 'intro.mp4') { loopVariantCache.set(original, original); return original; }
+  const dot = original.lastIndexOf('.');
+  if(dot<0){ loopVariantCache.set(original, original); return original; }
+  const baseName = original.slice(0,dot);
+  const ext = original.slice(dot); // .mp4
+  const candidate = `${baseName}_${q}${ext}`;
+  try{
+    const resp = await fetch(base + candidate, { method:'HEAD' });
+    if(resp.ok){ loopVariantCache.set(original, candidate); return candidate; }
+  }catch(e){}
+  loopVariantCache.set(original, original); // fallback
+  return original;
+}
+
+function posterFor(loopFile){
+  return base + loopFile.replace(/\.mp4$/,'_preview.jpg');
+}
+
+function applyPoster(videoEl, loopFile){
+  // Attempt poster; if it 404s browser will just ignore silently.
+  videoEl.poster = posterFor(loopFile);
+}
+
+// Idle helper (fallback to setTimeout) ------------------------------------------------
+function onIdle(cb){
+  if('requestIdleCallback' in window) return requestIdleCallback(cb,{ timeout:1200 });
+  return setTimeout(cb,350);
+}
+
+// Service Worker registration (non-blocking) -----------------------------------------
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('/cc-sw.js').catch(e=>console.warn('[CC][SW] register fail', e));
+}
+
+/*
+State model:
+  id: state key
+  loop: looping video filename
+  buttons: destinations (state ids) presented as UI buttons while in this state
+  transitions: mapping destinationState -> transition clip filename (one-shot)
+If a destination has no transition clip defined, we do an instant jump to its loop.
+
+Detected available loops & transitions from folder listing:
+Loops: intro.mp4, menu_loop.mp4, overview_loop.mp4, convention_loop.mp4, expo_loop.mp4, convention_floor_loop.mp4
+Transitions: intro_to_menu.mp4, menu_to_convention.mp4, convention_to_menu.mp4, menu_to_expo.mp4, expo_to_menu.mp4, menu_to_overview.mp4, overview_to_menu.mp4, convention_to_floor.mp4, floor_to_convention.mp4, expo_to_floor.mp4, floor_to_expo.mp4, overview_to_convention.mp4, overview_to_expo.mp4
+(No convention_to_overview.mp4 asset – we will auto-chain convention -> menu -> overview.)
+*/
+
+const states = {
+  intro: {
+    loop: 'intro.mp4',
+    buttons: ['menu'],
+    transitions: { menu: 'intro_to_menu.mp4' }
+  },
+  menu: {
+    loop: 'menu_loop.mp4',
+    buttons: ['overview','convention','expo'],
+    transitions: {
+      overview: 'menu_to_overview.mp4',
+      convention: 'menu_to_convention.mp4',
+      expo: 'menu_to_expo.mp4'
+    }
+  },
+  overview: {
+    loop: 'overview_loop.mp4',
+    buttons: ['menu','convention','expo'],
+    transitions: {
+      menu: 'overview_to_menu.mp4',
+      convention: 'overview_to_convention.mp4',
+      expo: 'overview_to_expo.mp4'
+    }
+  },
+  convention: {
+    loop: 'convention_loop.mp4',
+    // Removed direct 'expo' & 'overview' buttons per updated requirements
+    buttons: ['menu','convention_floor'],
+    transitions: {
+      menu: 'convention_to_menu.mp4',
+      // overview transition removed (no longer an allowed direct option)
+      convention_floor: 'convention_to_floor.mp4'
+    }
+  },
+  expo: {
+    loop: 'expo_loop.mp4',
+    // Removed direct 'convention' & 'overview' buttons per updated requirements
+    buttons: ['menu','expo_floor'],
+    transitions: {
+      menu: 'expo_to_menu.mp4',
+      // overview transition removed (no longer an allowed direct option)
+      expo_floor: 'expo_to_floor.mp4'
+    }
+  },
+  // Floor plan views (each with only an exit button) -------------------------------------------------
+  convention_floor: {
+    loop: 'convention_floor_loop.mp4',
+    buttons: ['convention'],
+    transitions: {
+      convention: 'floor_to_convention.mp4'
+    }
+  },
+  expo_floor: {
+    // Asset now present; no fallback expected.
+    loop: 'expo_floor_loop.mp4',
+    buttons: ['expo'],
+    transitions: { expo: 'floor_to_expo.mp4' }
+  }
+};
+
+// Additional placeholder locations to visually fill the left navigation (no videos yet)
+const EXTRA_LOCATIONS = [
+  'pavilion',
+  'ampitheatre',
+  'midway',
+  'hotel',
+  'parking'
+];
+
+// Persistent navigation list (does not change per state)
+const NAV_ITEMS = [
+  'menu','overview','convention','expo',
+  ...EXTRA_LOCATIONS
+];
+
+// Fallback chained transitions (multi-hop) when a direct asset is missing.
+// Removed convention->overview chain (overview no longer reachable directly from convention/expo).
+const fallbackChains = { };
+
+// -------------------- Persistence (restore last visited state) --------------------
+const STATE_KEY='cc_last_state';
+const STATE_TIME_KEY='cc_last_state_time';
+const STATE_MAX_AGE_MS=12*60*60*1000; // 12h
+function restoreState(){
+  try{
+    const params=new URLSearchParams(location.search);
+    if(params.has('forceReset')) return 'intro';
+    const s=sessionStorage.getItem(STATE_KEY);
+    const ts=parseInt(sessionStorage.getItem(STATE_TIME_KEY)||'0',10);
+    if(!s||!states[s]) return 'intro';
+    if(ts && (Date.now()-ts)>STATE_MAX_AGE_MS) return 'intro';
+    console.log('[CC][PERSIST] Restored state',s,'ageSeconds=', ((Date.now()-ts)/1000).toFixed(1));
+    return s;
+  }catch(e){ return 'intro'; }
+}
+function persistState(state){
+  try{
+    sessionStorage.setItem(STATE_KEY,state);
+    sessionStorage.setItem(STATE_TIME_KEY,Date.now().toString());
+  }catch(e){}
+}
+// ----------------------------------------------------------------------------------
+
+// Start from last state if available
+let current = restoreState();
+let isTransitioning = false; // prevent overlapping transition execution (we still allow interruption)
+let queuedDest = null; // destination requested while a transition is running
+let pendingDest = null; // destination the current transition is moving toward
+let currentTransitionAbort = null; // function to finalize current transition early
+// Track preloaded transition files to avoid unbounded <link> growth
+const preloaded = new Set();
+
+const active = document.getElementById('active');
+const next = document.getElementById('next');
+const buffer = document.getElementById('buffer');
+const ui = document.getElementById('ui');
+const statusEl = document.getElementById('statusText');
+// Floor plan elements
+const floorBox = document.getElementById('floorOptions');
+const floorTitle = document.getElementById('floorTitle');
+const floorPrice = document.getElementById('floorPrice');
+const floorDesc = document.getElementById('floorDesc');
+const floorDots = document.getElementById('floorDots');
+const floorPreview = document.getElementById('floorPreview');
+let floorIdx = parseInt(sessionStorage.getItem('cc_floor_idx')||'0',10) || 0;
+
+// ---------- Instrumentation (diagnose unexpected reloads) ----------
+(function instrument(){
+  const loadTs=Date.now();
+  const LAST_KEY='cc_last_load_ts';
+  const prevTs=parseInt(sessionStorage.getItem(LAST_KEY)||'0',10);
+  sessionStorage.setItem(LAST_KEY,String(loadTs));
+  const nav=(performance.getEntriesByType('navigation')||[])[0];
+  const quickReload = prevTs && (loadTs-prevTs)<5000; // <5s since last load
+  console.log('[CC][INST] load navType=', nav && nav.type, 'deltaSec=', prevTs?((loadTs-prevTs)/1000).toFixed(2):'N/A','quickReload=',quickReload);
+  if(quickReload) console.warn('[CC][INST] Unexpected quick reload detected');
+  window.addEventListener('pageshow',e=>console.log('[CC][INST] pageshow persisted=',e.persisted));
+  window.addEventListener('pagehide',e=>console.log('[CC][INST] pagehide',e.persisted));
+  document.addEventListener('visibilitychange',()=>console.log('[CC][INST] visibility hidden=',document.hidden));
+  window.addEventListener('error',e=>console.log('[CC][INST] window.error', e.message));
+  window.addEventListener('unhandledrejection',e=>console.log('[CC][INST] unhandledrejection', e.reason));
+})();
+// ------------------------------------------------------------------
+
+init();
+
+async function init(){
+  disableUI(true);
+  await loadLoop(states[current].loop);
+  try { await active.play(); } catch(e) {}
+  setState(current);
+  disableUI(false);
+  status('Ready');
+  updateMobileContain();
+}
+
+function setState(s){
+  current = s;
+  buildButtons();
+  preloadNextTransitions();
+  persistState(s); // record last visited (even during transition to make resume feel natural)
+  status('State: '+s);
+  console.log('[CC] setState ->', s);
+  updateStateTitle(s);
+  updateFloorUIVisibility();
+  syncMenuVisibilityForFloor();
+  if(typeof syncBannerHeight === 'function') syncBannerHeight();
+  if(typeof updateHUDVisibility === 'function') updateHUDVisibility();
+  // Pause/resume event slideshow depending on floor state visibility
+  if(typeof syncEventSlideshow === 'function') syncEventSlideshow();
+}
+
+// ---------- Tool rail handlers ----------
+document.addEventListener('DOMContentLoaded', ()=>{
+  const fsBtn = document.getElementById('btnFullscreen');
+  const resetCtl = document.getElementById('btnReset');
+  const root = document.documentElement;
+  const toggleFS = async()=>{
+    try{
+      if(!document.fullscreenElement){ await root.requestFullscreen(); }
+      else { await document.exitFullscreen(); }
+    }catch(e){ console.warn('Fullscreen toggle failed', e); }
   };
-  const DEFAULT_STATE = "menu";
+  const doReset = ()=>{ const btn=document.getElementById('resetBtn'); if(btn) btn.click(); else resetToIntro(); };
+  if(fsBtn) fsBtn.addEventListener('click', toggleFS);
+  if(resetCtl) resetCtl.addEventListener('click', doReset);
+});
 
-  // Debug flag via URL ?debug=1
-  const DEBUG = new URLSearchParams(location.search).get("debug") === "1";
+// Inline SVG line icons (placeholder set) – replace with production emblems later
+const ICONS = {
+  // Main menu: grid / hub
+  menu: `<svg viewBox='0 0 24 24' aria-hidden='true'><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/></svg>`,
+  // Overview: compass + outer ring
+  overview: `<svg viewBox='0 0 24 24' aria-hidden='true'><circle cx='12' cy='12' r='9'/><path d='M15.5 8.5 13.4 13.4 8.5 15.5l2.1-4.9z'/></svg>`,
+  // Convention hall: classical building with columns
+  convention: `<svg viewBox='0 0 24 24' aria-hidden='true'><path d='M4 10h16M5 10V8.6L12 5l7 3.6V10M7 10v8M12 10v8M17 10v8M4 18h16M10 14h4'/></svg>`,
+  // Expo: pavilion / tent shape with flag
+  expo: `<svg viewBox='0 0 24 24' aria-hidden='true'><path d='M3 18h18L12 6 3 18Z'/><path d='M12 6V4l3 1.2L12 6Z'/></svg>`,
+  // Convention floor plan: blueprint style (C-shaped outline + grid)
+  convention_floor: `<svg viewBox='0 0 24 24' aria-hidden='true'><rect x='4' y='4' width='16' height='16' rx='2'/><path d='M10 4v16M4 10h8M14 8h4M14 12h4M14 16h2'/></svg>`,
+  // Expo floor plan: alternate blueprint with central aisles
+  expo_floor: `<svg viewBox='0 0 24 24' aria-hidden='true'><rect x='4' y='4' width='16' height='16' rx='2'/><path d='M8 4v16M16 4v16M4 12h16M10 8h4M10 16h4'/></svg>`,
+  // Intro / start: play triangle inside ring
+  intro: `<svg viewBox='0 0 24 24' aria-hidden='true'><circle cx='12' cy='12' r='9'/><path d='M10 8v8l6-4z'/></svg>`,
+  default: `<svg viewBox='0 0 24 24' aria-hidden='true'><rect x='5' y='5' width='14' height='14' rx='2'/></svg>`
+};
 
-  // UI refs
-  const vidA = document.getElementById("vidA");
-  const vidB = document.getElementById("vidB");
-  const vidBuf = document.getElementById("vidBuf");
-  const statusEl = document.getElementById("status");
-  const btnReset = document.getElementById("btnReset");
-  const btnContain = document.getElementById("btnContain");
-  const btnMute = document.getElementById("btnMute");
-  const destinationsWrap = document.getElementById("destinations");
-  const toast = document.getElementById("toast");
+let lastPressedButton = null; // track last clicked (selected) item
+let navInitialized = false;
+let selectedNav = null; // item that should appear largest & brightest
 
-  if (DEBUG){ statusEl.style.display = "block"; }
-
-  // Simple logger
-  function log(...args){
-    if(!DEBUG) return;
-    console.log(...args);
-    statusEl.textContent = [statusEl.textContent, args.map(a=>typeof a==="string"?a:JSON.stringify(a)).join(" ")].filter(Boolean).join("\n").slice(-1800);
-  }
-  function showToast(msg, ms=1800){
-    toast.textContent = msg;
-    toast.style.display = "block";
-    clearTimeout(showToast._t);
-    showToast._t = setTimeout(()=> toast.style.display="none", ms);
-  }
-
-  // Accessibility
-  function setActiveButton(dest){
-    for(const b of destinationsWrap.querySelectorAll("button")){
-      const active = b.dataset.dest === dest;
-      b.classList.toggle("active", active);
-      b.setAttribute("aria-current", active ? "true" : "false");
-    }
-  }
-
-  // Posters (use *_preview.jpg next to loop files)
-  function posterFor(loopFile){
-    return base + loopFile.replace(/\.mp4$/i, "_preview.jpg");
-  }
-
-  // HEAD with GET-range fallback only to *verify* existence (filenames unchanged).
-  async function urlExists(url){
-    try{
-      let resp = await fetch(url, { method:'HEAD' });
-      if(!resp.ok){
-        resp = await fetch(url, { headers: { Range: "bytes=0-0" } });
-      }
-      return resp.ok;
-    }catch(e){ return false; }
-  }
-
-  // Triple buffer management
-  let active = vidA, next = vidB, buffer = vidBuf;
-  function swap(){
-    const oldActive = active;
-    active.classList.add("hidden");
-    next.classList.remove("hidden");
-    buffer.classList.add("hidden");
-    active = next;
-    next = buffer;
-    buffer = oldActive;
-  }
-
-  async function applyPoster(videoEl, loopFile){
-    videoEl.setAttribute("poster", posterFor(loopFile));
-  }
-
-  // State
-  let current = DEFAULT_STATE;
-  let containMode = false;
-  let muted = true;
-
-  function setContainMode(on){
-    containMode = !!on;
-    for(const v of [vidA,vidB,vidBuf]){
-      v.classList.toggle("contain", containMode);
-    }
-    btnContain.setAttribute("aria-pressed", containMode ? "true":"false");
-    showToast(containMode ? "Fit content" : "Fill screen");
-  }
-  function setMuted(on){
-    muted = !!on;
-    for(const v of [vidA,vidB,vidBuf]) v.muted = muted;
-    btnMute.setAttribute("aria-pressed", muted ? "true" : "false");
-    showToast(muted ? "Muted" : "Sound on");
-  }
-
-  // Visibility save
-  document.addEventListener("visibilitychange", ()=>{
-    const vids = [active,next,buffer];
-    if(document.hidden){ vids.forEach(v=>{ try{v.pause();}catch{} }); }
-    else { try{ active.play(); }catch{} }
-  });
-
-  // Load / play helpers — use filenames exactly as provided
-  async function playLoop(stateKey){
-    const state = STATES[stateKey];
-    const loopFile = state.loop;
-    await applyPoster(next, loopFile);
-    next.src = base + loopFile;
-    next.loop = true;
-    await next.play().catch(()=>{});
-    swap();
-    setActiveButton(stateKey);
-    current = stateKey;
-    saveSession();
-    log("Loop:", stateKey, loopFile);
-  }
-
-  async function playTransition(fromKey, toKey){
-    const from = STATES[fromKey];
-    const to = STATES[toKey];
-    const tInfo = from.to?.[toKey];
-    if(!tInfo){ log("No transition mapping", fromKey, toKey); return playLoop(toKey); }
-
-    const file = tInfo.transition; // use exact filename
-    const ok = await urlExists(base + file);
-    if(!ok){
-      log("Transition missing, falling back to loop:", file);
-      return playLoop(toKey);
-    }
-
-    buffer.removeAttribute("poster");
-    buffer.loop = false;
-    buffer.src = base + file;
-    await buffer.play().catch(()=>{});
-
-    buffer.onended = async ()=>{
-      buffer.onended = null;
-      await playLoop(toKey);
-    };
-
-    next.classList.add("hidden");
-    active.classList.add("hidden");
-    buffer.classList.remove("hidden");
-    active.pause();
-    log("Transition:", fromKey, "->", toKey, file);
-  }
-
-  function saveSession(){
-    try{
-      localStorage.setItem("cc_state", JSON.stringify({ current, containMode, muted }));
-    }catch{}
-  }
-  function restoreSession(){
-    try{
-      const d = JSON.parse(localStorage.getItem("cc_state") || "null");
-      if(!d) return;
-      current = d.current || DEFAULT_STATE;
-      setContainMode(!!d.containMode);
-      setMuted(d.muted !== false); // default muted true
-    }catch{}
-  }
-
-  // Build destination buttons (modern segmented style)
-  function buildButtons(){
-    destinationsWrap.innerHTML = "";
-    Object.entries(STATES).forEach(([key, val])=>{
-      const b = document.createElement("button");
-      b.className = "btn";
-      b.dataset.dest = key;
-      b.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M4 12h16"/><path d="M12 4v16"/></svg>${val.label}`;
-      b.setAttribute("aria-label", val.label);
-      b.addEventListener("click", ()=>{
-        if(key === current) return;
-        disableDestinations(true);
-        playTransition(current, key).finally(()=> disableDestinations(false));
+function buildButtons(){
+  if(!navInitialized){
+    ui.innerHTML='';
+    NAV_ITEMS.forEach(dest=>{
+      const isExtra = EXTRA_LOCATIONS.includes(dest);
+      const b=document.createElement('button');
+      b.className='btn';
+      b.dataset.dest = dest;
+      const icon = ICONS[dest] || ICONS.default;
+      const label = dest.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
+      b.innerHTML = `<div class="btn-inner"><div class="btn-icon" aria-hidden="true">${icon}</div><div class="btn-label">${label}</div></div>`;
+      b.addEventListener('click',()=>{
+        selectedNav = dest; // always visually select
+        lastPressedButton = dest;
+        updateNavActive();
+        if(!isExtra){
+          console.log('[CC][BTN] nav ->', dest);
+          go(dest);
+        }
       });
-      destinationsWrap.appendChild(b);
+      ui.appendChild(b);
     });
-    setActiveButton(current);
-  }
-  function disableDestinations(disabled){
-    destinationsWrap.querySelectorAll("button").forEach(b=> b.disabled = disabled);
-  }
-
-  // Controls
-  btnReset.addEventListener("click", ()=>{
-    playTransition(current, DEFAULT_STATE);
-  });
-  btnContain.addEventListener("click", ()=> setContainMode(!containMode));
-  btnMute.addEventListener("click", ()=> setMuted(!muted));
-
-  async function init(){
-    restoreSession();
-    buildButtons();
-    setMuted(true);
-    await playLoop(current);
-    registerSW();
-  }
-
-  async function registerSW(){
-    if("serviceWorker" in navigator){
-      try{
-        await navigator.serviceWorker.register("./cc-sw.js", { scope: "./" });
-        log("SW registered");
-      }catch(e){ log("SW failed", e); }
+    navInitialized = true;
+    // Default selection: current state if in list, else first item
+    selectedNav = NAV_ITEMS.includes(current) ? current : NAV_ITEMS[0];
+  } else {
+    // On state change (setState) keep existing DOM; if navigating to a real state select it
+    if(NAV_ITEMS.includes(current)) {
+      // If entering a floor state, keep the parent hall highlighted instead of *_floor
+      if(current === 'convention_floor') selectedNav = 'convention';
+      else if(current === 'expo_floor') selectedNav = 'expo';
+      else selectedNav = current;
     }
   }
+  updateNavActive();
+}
 
-  window.addEventListener("load", init);
-  </script>
+function updateNavActive(){
+  const inFloor = (current==='convention_floor' || current==='expo_floor');
+  // Inject synthetic exit button if in floor state (once)
+  if(inFloor){
+    let exitBtn = ui.querySelector('.btn[data-dest="__exit_floor"]');
+    if(!exitBtn){
+      exitBtn = document.createElement('button');
+      exitBtn.className='btn';
+      exitBtn.dataset.dest='__exit_floor';
+      exitBtn.innerHTML = `<div class="btn-inner"><div class="btn-label">Exit Floor Plan View</div></div>`;
+      // Insert directly after parent (convention/expo)
+      const parentKey = current==='convention_floor' ? 'convention' : 'expo';
+      const parentBtn = ui.querySelector(`.btn[data-dest="${parentKey}"]`);
+      if(parentBtn) parentBtn.insertAdjacentElement('afterend', exitBtn); else ui.prepend(exitBtn);
+      exitBtn.addEventListener('click', ()=>{ if(current==='convention_floor') go('convention'); else if(current==='expo_floor') go('expo'); });
+    }
+    // During floor, force selectedNav to synthetic exit
+    selectedNav='__exit_floor';
+  } else {
+    // Remove synthetic exit if present
+    const ex = ui.querySelector('.btn[data-dest="__exit_floor"]');
+    if(ex) ex.remove();
+  }
+  Array.from(ui.querySelectorAll('.btn')).forEach(b=>{
+    if(b.dataset.dest === selectedNav){
+      b.classList.add('active');
+    } else {
+      b.classList.remove('active');
+    }
+    b.classList.toggle('floor-exit-active', b.dataset.dest==='__exit_floor');
+  });
+  injectInlineFloorPanel();
+}
+
+// Inline mini floor plan panel logic -------------------------------------------------
+let inlinePanelEl = null;
+function injectInlineFloorPanel(){
+  if(!ui) return;
+  const inFloor = (current==='convention_floor' || current==='expo_floor');
+  if(inFloor){ // no inline panel in floor view (synthetic nav button handles exit)
+    if(inlinePanelEl && inlinePanelEl.parentNode){ inlinePanelEl.parentNode.removeChild(inlinePanelEl); inlinePanelEl=null; }
+    return;
+  }
+  // Remove existing panel if selection changed away from a target
+  const needsPanel = (selectedNav === 'convention' || selectedNav === 'expo');
+  if(!needsPanel){
+    if(inlinePanelEl && inlinePanelEl.parentNode){ inlinePanelEl.parentNode.removeChild(inlinePanelEl); inlinePanelEl=null; }
+    if(typeof computeNavOffset==='function') computeNavOffset();
+    return;
+  }
+  const activeBtn = ui.querySelector('.btn.active');
+  if(!activeBtn) return;
+  // If panel already exists and is positioned right after active button keep it
+  if(inlinePanelEl && inlinePanelEl.previousElementSibling === activeBtn) return;
+  if(inlinePanelEl && inlinePanelEl.parentNode) inlinePanelEl.parentNode.removeChild(inlinePanelEl);
+  inlinePanelEl = document.createElement('div');
+  inlinePanelEl.className='inline-floor-panel';
+  const isConvention = selectedNav === 'convention';
+  const floorState = isConvention ? 'convention_floor' : 'expo_floor';
+  inlinePanelEl.innerHTML = `<button type="button" data-inline-open="${floorState}" aria-label="Open floor plan view for ${isConvention? 'Convention' : 'Expo'}">Floor Plan View ›</button>`;
+  activeBtn.insertAdjacentElement('afterend', inlinePanelEl);
+  inlinePanelEl.querySelector('[data-inline-open]')?.addEventListener('click', (e)=>{
+    const dest = e.currentTarget.getAttribute('data-inline-open');
+    if(dest) go(dest);
+  });
+  // Recenter after layout shift
+  if(typeof computeNavOffset==='function') setTimeout(computeNavOffset, 30);
+}
+
+async function go(dest){
+  if(dest===current && !isTransitioning) { console.log('[CC][GO] ignoring same-state request', dest); return; }
+  if(isTransitioning){
+    if(dest !== pendingDest){
+      queuedDest = dest;
+      console.log('[CC][GO] queued (will interrupt) ->', dest);
+      if(currentTransitionAbort){ currentTransitionAbort('interrupted'); }
+    }
+    return;
+  }
+  const from = current;
+
+  const transFile = states[from].transitions?.[dest];
+  const destLoop = states[dest] && states[dest].loop;
+  if(!states[dest]){ console.warn('[CC][GO] Unknown destination state', dest); return; }
+  const isFloorExit = from.endsWith('_floor') && dest!=='intro';
+
+  if(!transFile){
+    const chainKey = from+':'+dest;
+    if(fallbackChains[chainKey]){
+      console.log('[CC][GO] using fallback chain', chainKey, '->', fallbackChains[chainKey]);
+      runChain(fallbackChains[chainKey].slice());
+      return;
+    }
+    console.log('[CC][GO] instantSwitch (no transition asset)', from,'->',dest);
+    await instantSwitch(dest);
+    return;
+  }
+  console.log('[CC][GO] transition asset found', from,'->',dest,'file=',transFile,'floorExit=',isFloorExit);
+  isTransitioning = true;
+  pendingDest = dest;
+  queuedDest = null;
+  const isEnterConventionFloor = (from==='convention' && dest==='convention_floor');
+  if(isEnterConventionFloor){
+    console.log('[CC][GO][FLOOR] Deferring setState until after transition play start to ensure video visible.');
+  } else {
+    setState(dest);
+  }
+  status(isFloorExit ? 'Exiting Floorplan...' : (isEnterConventionFloor ? 'Entering Convention Floor...' : 'Transitioning...'));
+
+  let transitionErrored = false;
+  try {
+    await playTransition(transFile, destLoop, dest);
+  } catch(e){
+    transitionErrored = true;
+    console.warn('[CC][GO] playTransition error - falling back to instantSwitch', e);
+  }
+
+  if(transitionErrored){
+    try { await instantSwitch(dest); } catch(e){ console.warn('[CC][GO] instantSwitch after error failed', e); }
+  }
+
+  // If we deferred state update (convention -> convention_floor), apply now
+  if(isEnterConventionFloor){
+    console.log('[CC][GO][FLOOR] Applying deferred setState for convention_floor');
+    setState(dest);
+  }
+  current = pendingDest;
+  pendingDest = null;
+  isTransitioning = false;
+  if(queuedDest && queuedDest !== current){
+    const nextDest = queuedDest; queuedDest=null;
+    setTimeout(()=>go(nextDest),0);
+    return;
+  }
+  status('Ready');
+}
+
+// Custom labeling for floor plan entry/exit
+function buttonLabelFor(from,to){
+  if(from==='convention' && to==='convention_floor') return 'Floor Plan View';
+  if(from==='expo' && to==='expo_floor') return 'Floor Plan View';
+  if(from==='convention_floor' && to==='convention') return 'Exit Floorplan View';
+  if(from==='expo_floor' && to==='expo') return 'Exit Floorplan View';
+  return to.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
+}
+
+async function instantSwitch(dest){
+  queuedDest = null;
+  pendingDest = null;
+  isTransitioning = true;
+  status('Switching...');
+  const newLoop = states[dest].loop;
+  const resolved = await resolveLoopFilename(newLoop);
+  const tmp = document.createElement('video');
+  tmp.muted=true; tmp.playsInline=true; tmp.loop=true; tmp.style.position='absolute'; tmp.style.inset='0'; tmp.style.width='100%'; tmp.style.height='100%'; tmp.style.objectFit='cover'; tmp.style.opacity='0'; tmp.style.zIndex='3';
+  tmp.src = base + resolved;
+  applyPoster(tmp, resolved);
+  document.getElementById('stage').appendChild(tmp);
+  await waitReady(tmp);
+  try{ await tmp.play(); }catch(e){}
+  tmp.classList.add('crossfade-enter');
+  requestAnimationFrame(()=>{ tmp.classList.add('crossfade-show'); });
+  // Promote tmp to active only after active video prepared to eliminate black flash
+  setTimeout(async ()=>{
+    try {
+  active.src = tmp.src;
+      active.loop = true;
+      await waitReady(active);
+      try { await active.play(); } catch(e) {}
+    } catch(e){ console.warn('[CC] instantSwitch play issue', e); }
+    try { document.getElementById('stage').removeChild(tmp); } catch(e) {}
+    current = dest;
+    setState(dest);
+    isTransitioning = false;
+    status('Ready');
+  }, 600); // slightly longer to ensure new loop buffered
+}
+
+function playTransition(viaFile, destLoop, destId){
+  console.log('[CC] playTransition start', viaFile, '->', destLoop);
+  if(viaFile==='floor_to_expo.mp4') console.log('[CC] floor_to_expo INIT (Exit Expo Floorplan)');
+  if(viaFile==='convention_to_overview.mp4') console.log('[CC] convention_to_overview INIT');
+  return new Promise(async (resolve) => {
+    let finalized=false;
+    let firstFrameShown=false;
+    let endedFired=false;
+    let timeCheckInterval;
+    currentTransitionAbort = (reason='aborted')=>{ if(!finalized){ console.warn('[CC] abort transition early:',reason); finalize(reason); } };
+    next.style.transition='none';
+    next.style.opacity='0';
+    next.src=base+viaFile; next.loop=false;
+    next.addEventListener('error',()=>{ console.warn('[CC][TRANS] video error', viaFile,'falling back'); });
+    next.addEventListener('loadedmetadata',()=>console.log('[CC][TRANS] loadedmetadata', viaFile,'dur=',next.duration));
+    next.addEventListener('loadeddata',()=>console.log('[CC][TRANS] loadeddata', viaFile));
+    const ensureMeta = new Promise(r=>{ if(next.readyState>=1) return r(); next.addEventListener('loadedmetadata',r,{once:true}); next.addEventListener('error',r,{once:true}); });
+    try{ await ensureMeta; }catch(e){}
+    try{ next.currentTime=0; }catch(e){}
+    const preloadLoop=(async()=>{ 
+      const resolvedDest = await resolveLoopFilename(destLoop);
+      buffer.src=base+resolvedDest; buffer.loop=true; applyPoster(buffer, resolvedDest); await waitReady(buffer,'preloadLoop:'+resolvedDest); 
+    })();
+    function showFirstFrame(){
+      if(firstFrameShown) return;
+      firstFrameShown=true;
+      console.log('[CC][TRANS] showFirstFrame', viaFile, 't=', next.currentTime.toFixed(2));
+      next.style.transition='opacity .15s ease'; // faster fade to mask prior loop flash
+      next.style.opacity='1';
+      try{ active.pause(); }catch(e){}
+    }
+    async function finalize(reason){
+      if(finalized) return; finalized=true; currentTransitionAbort=null; if(timeCheckInterval) clearInterval(timeCheckInterval);
+      console.log('[CC] finalize transition:',viaFile,'reason=',reason);
+      try{ await Promise.race([preloadLoop,new Promise(r=>setTimeout(r,800))]); }catch(e){}
+      if(!buffer.src){
+        const resolvedDest = await resolveLoopFilename(destLoop);
+        buffer.src=base+resolvedDest; buffer.loop=true; applyPoster(buffer,resolvedDest);
+      }
+      try { active.src = buffer.src; active.loop = true; applyPoster(active, destLoop); await waitReady(active,'finalizeLoop'); try{ await active.play(); }catch(e){} } catch(e){ console.warn('[CC] loop swap issue', e); }
+      next.style.transition='opacity .35s ease';
+      requestAnimationFrame(()=>{ next.style.opacity='0'; });
+      setTimeout(()=>{ try{ next.pause(); next.removeAttribute('src'); next.load(); }catch(e){} persistState(destId); resolve(); },380);
+    }
+    function handleEnded(){ endedFired=true; if(timeCheckInterval) clearInterval(timeCheckInterval); console.log('[CC][TRANS] ended', viaFile); finalize('ended'); }
+    next.addEventListener('error',()=>finalize('error'),{once:true});
+    // Legacy frame-detect listeners retained as safety but we will now force early reveal right after play() below
+    let frameCheckCount=0;
+    function onProgress(){
+      if(next.currentTime>0 || next.readyState>=2){ showFirstFrame(); next.removeEventListener('timeupdate',onProgress); next.removeEventListener('playing',onProgress); }
+      else if(frameCheckCount++>40){ showFirstFrame(); }
+    }
+    next.addEventListener('timeupdate',onProgress);
+    next.addEventListener('playing',onProgress);
+    try{ await next.play(); }catch(e){ console.warn('[CC] next.play fail',e,'-> instant fallback'); finalize('play-fail'); return; }
+    // NEW: show overlay immediately (do not wait for frame decode) to avoid underlying loop flash
+    showFirstFrame();
+    timeCheckInterval = setInterval(()=>{ if(next.duration && next.currentTime >= next.duration && !endedFired){ handleEnded(); } },100);
+    setTimeout(()=>{ if(!finalized && !endedFired){ console.warn('[CC] watchdog finalize (no ended)', viaFile); finalize('watchdog'); } },60000);
+  });
+}
+
+function waitReady(videoEl,label){
+  return new Promise(res=>{
+    const start = performance.now();
+    let done=false;
+    function finish(reason){
+      if(done) return; done=true;
+      console.log('[CC][waitReady]', label||videoEl.id||'(video)', 'reason=',reason, 'readyState=',videoEl.readyState,'ms=',(performance.now()-start).toFixed(0));
+      res();
+    }
+    if(videoEl.readyState>=3) return finish('already-ready');
+    const to = setTimeout(()=>finish('timeout'),1500);
+    const onCan=()=>{ cleanup(); finish('canplay'); };
+    const onErr=()=>{ cleanup(); finish('error'); };
+    function cleanup(){
+      clearTimeout(to);
+      videoEl.removeEventListener('canplaythrough',onCan);
+      videoEl.removeEventListener('loadeddata',onCan);
+      videoEl.removeEventListener('error',onErr);
+    }
+    videoEl.addEventListener('canplaythrough',onCan,{once:true});
+    videoEl.addEventListener('loadeddata',onCan,{once:true});
+    videoEl.addEventListener('error',onErr,{once:true});
+  });
+}
+
+async function loadLoop(file){
+  const resolved = await resolveLoopFilename(file);
+  active.src = base + resolved;
+  active.loop = true;
+  applyPoster(active, resolved);
+  await waitReady(active, 'loadLoop:'+resolved);
+  try {
+    await active.play();
+  } catch(e){ console.warn('[CC][VIDEO] initial play() failed for', resolved, e); }
+  // Extra reliability for floor loops: if paused shortly after, retry once
+  if((file==='convention_floor_loop.mp4'||file==='expo_floor_loop.mp4')){
+    setTimeout(()=>{
+      if(active.paused){
+        console.log('[CC][VIDEO] retrying play() for floor loop', resolved);
+        active.play().catch(err=>console.warn('[CC][VIDEO] retry floor play failed', err));
+      }
+    }, 300);
+  }
+}
+
+function preloadNextTransitions(){
+  const t = states[current].transitions;
+  // Eager preload only first 2 transitions to reduce concurrent fetch pressure.
+  if(t){
+    Object.values(t).slice(0,2).forEach(f=>{
+      if(!f || preloaded.has(f)) return;
+      preloaded.add(f);
+      const link=document.createElement('link');
+      link.rel='preload'; link.as='video'; link.href=base+f; document.head.appendChild(link);
+    });
+    // Defer remaining (if any) to idle time
+    const deferred = Object.values(t).slice(2).filter(f=>f && !preloaded.has(f));
+    if(deferred.length){
+      onIdle(()=>{
+        deferred.forEach(f=>{
+          if(preloaded.has(f)) return; preloaded.add(f);
+          const link=document.createElement('link'); link.rel='preload'; link.as='video'; link.href=base+f; document.head.appendChild(link);
+        });
+      });
+    }
+  }
+  // Destination loops (variant aware) – only eager preload first; idle preload rest
+  const destLoops = (states[current].buttons||[]).map(d=>states[d] && states[d].loop).filter(Boolean);
+  if(destLoops.length){
+    const first = destLoops[0];
+    if(first && !preloaded.has(first)){
+      preloaded.add(first);
+      resolveLoopFilename(first).then(resolved=>{
+        const link=document.createElement('link'); link.rel='preload'; link.as='video'; link.href=base+resolved; document.head.appendChild(link);
+      });
+    }
+    const rest = destLoops.slice(1).filter(l=>!preloaded.has(l));
+    if(rest.length){
+      onIdle(()=>{
+        rest.forEach(l=>{ if(preloaded.has(l)) return; preloaded.add(l); resolveLoopFilename(l).then(resolved=>{ const link=document.createElement('link'); link.rel='preload'; link.as='video'; link.href=base+resolved; document.head.appendChild(link); }); });
+      });
+    }
+  }
+}
+
+// --------- Responsive video sizing (mobile preserve >=75% original framing) ---------
+function updateMobileContain(){
+  if(window.innerWidth<=800){
+    document.body.classList.add('mobile-contain');
+  }else{
+    document.body.classList.remove('mobile-contain');
+  }
+}
+window.addEventListener('resize',()=>{
+  // Debounce via rAF
+  if(window.__mobRaf) cancelAnimationFrame(window.__mobRaf);
+  window.__mobRaf = requestAnimationFrame(()=>{ updateMobileContain(); syncMenuVisibilityForFloor(); });
+});
+// -------------------------------------------------------------------------------
+
+function disableUI(flag){
+  Array.from(ui.querySelectorAll('button')).forEach(b=>b.disabled=flag);
+  status(flag?'Busy...':'Ready');
+}
+
+function status(msg){ statusEl.textContent = msg; }
+
+function updateStateTitle(s){
+  const el = document.getElementById('stateTitle');
+  if(!el) return;
+  const pretty = buttonLabelFor(s,s) // re-use capitalization helper
+    .replace(/Floor Plan View/i,'Floor Plan')
+    .replace(/Exit Floorplan View/i,'Floor Plan');
+  el.textContent = pretty;
+}
+
+// -------- Floor plan carousel (convention_floor only) ------------------------
+const baseLayouts = [
+  { title:'Round Tables x Full Room', desc:'Circle tables with 6 chairs per table. Suitable for banquets and mixers. Includes basic room setup and teardown.', price: 1800 },
+  { title:'Empty Open Room', desc:'No furnishings. Open floor ideal for exhibitions or custom staging. Includes access to power and basic lighting.', price: 1000 },
+  { title:'Conference + Stage', desc:'20 rectangle tables with 2 chairs each, center aisle; stage, projector, microphone and podium included.', price: 2200 },
+  { title:'Home Show Booth Grid', desc:'Trade show style with 10’x4’ booths, center aisles, drape separators, registration desk and signage points.', price: 2500 },
+];
+
+function rand(min,max){ return Math.floor(Math.random()*(max-min+1))+min; }
+function currency(n){ return `$${n.toLocaleString()}`; }
+
+function randomLayouts(n){
+  const types=['Classroom','Banquet','Theater','U-Shape','Boardroom','Expo Pods','Workshop Pods'];
+  const extras=['basic AV','premium AV','podium','stage','dual projectors','wired mics','wireless mics','pipe-and-drape'];
+  const out=[];
+  for(let i=0;i<n;i++){
+    const t = types[rand(0,types.length-1)];
+    const tables = rand(8,36);
+    const chairsPer = rand(2,8);
+    const extra = extras[rand(0,extras.length-1)];
+    const price = 900 + tables*20 + chairsPer*30 + rand(0,400);
+    out.push({
+      title: `${t} Layout — ${tables} tables x ${chairsPer} chairs`,
+      desc: `Includes ${extra}. Flexible spacing with safety aisles and signage. Setup/teardown included.`,
+      price
+    });
+  }
+  return out;
+}
+
+// Keep total at 10: 4 base + 6 random
+const layouts = [...baseLayouts, ...randomLayouts(6)];
+
+function buildDots(){
+  if(!floorDots) return;
+  floorDots.innerHTML='';
+  layouts.forEach((_,i)=>{
+    const d=document.createElement('div');
+    d.className='floor-dot'+(i===floorIdx?' active':'');
+    d.addEventListener('click',()=>{ setFloorIdx(i); });
+    floorDots.appendChild(d);
+  });
+}
+
+function setFloorIdx(i){
+  floorIdx = (i+layouts.length)%layouts.length;
+  sessionStorage.setItem('cc_floor_idx', String(floorIdx));
+  renderFloor();
+}
+
+function renderFloor(){
+  if(!floorBox) return;
+  const cur = layouts[floorIdx];
+  if(!cur) return;
+  floorTitle.textContent = cur.title;
+  floorPrice.textContent = `${currency(cur.price)}/day`;
+  floorDesc.textContent = cur.desc;
+  if(floorPreview){
+    floorPreview.innerHTML = svgForLayout(cur);
+  }
+  Array.from(floorDots.children).forEach((el,idx)=>{
+    if(idx===floorIdx) el.classList.add('active'); else el.classList.remove('active');
+  });
+  // Adjust banner height after preview re-renders
+}
+
+// Generate a light-weight blueprint diagram based on the layout name and numbers
+function svgForLayout(layout){
+  const w=840,h=520, pad=12; // canvas and padding
+  const roomW=w-2*pad, roomH=h-2*pad;
+  const room = `<rect x="${pad}" y="${pad}" width="${roomW}" height="${roomH}" rx="16" fill="rgba(6,10,18,.35)" stroke="rgba(220,230,245,.25)"/>`;
+  const title = (layout.title||'').toLowerCase();
+
+  // ---------- primitives ----------
+  const colorTable = 'rgba(220,230,245,.16)';
+  const colorTableStroke = 'rgba(220,230,245,.35)';
+  const colorChair = 'rgba(239,68,68,.28)';
+  const colorChairStroke = 'rgba(239,68,68,.55)';
+  const colorAccent = 'rgba(59,130,246,.55)';
+  const MARGIN = 8;
+  const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
+  function rectTable(x,y,wid,ht){
+    return `<rect x="${x-wid/2}" y="${y-ht/2}" width="${wid}" height="${ht}" rx="10" fill="${colorTable}" stroke="${colorTableStroke}"/>`;
+  }
+  function roundTable(x,y,r){
+    return `<circle cx="${x}" cy="${y}" r="${r}" fill="${colorTable}" stroke="${colorTableStroke}"/>`;
+  }
+  function chair(x,y,size=28){
+    const r = Math.max(4, size*0.15);
+    return `<rect x="${x-size/2}" y="${y-size/2}" width="${size}" height="${size}" rx="${r}" fill="${colorChair}" stroke="${colorChairStroke}"/>`;
+  }
+  function stage(height=80){
+  return `<rect x="${pad}" y="${h-pad-height}" width="${roomW}" height="${height}" rx="12" fill="rgba(59,130,246,.14)" stroke="${colorAccent}"/>`;
+  }
+  function signage(x,y){
+    return `<circle cx="${x}" cy="${y}" r="8" fill="rgba(0,255,148,.18)" stroke="${colorAccent}"/>`;
+  }
+  function registrationDesk(x,y,wid=120,ht=36){
+    return `<rect x="${x-wid/2}" y="${y-ht/2}" width="${wid}" height="${ht}" rx="8" fill="rgba(0,255,148,.14)" stroke="${colorAccent}"/>`;
+  }
+  // Scale a rectangle to cover at least a given fraction of the room in its dominant dimension
+  function fitRectToRoom(aspect, cover=0.82){
+    // Try covering width first
+    let W = roomW*cover;
+    let H = W/aspect;
+    if(H>roomH*cover){
+      H = roomH*cover;
+      W = H*aspect;
+    }
+    return { W, H };
+  }
+  function bigChair(cx,cy,size){
+    const r = Math.max(8, size*0.06);
+    return `<rect x="${cx-size/2}" y="${cy-size/2}" width="${size}" height="${size}" rx="${r}" fill="${colorChair}" stroke="${colorChairStroke}"/>`;
+  }
+  // evenly spaced grid positions within bounds
+  function gridPositions(rows, cols, bounds, gutterX=22, gutterY=22){
+    const {x,y,w:W,h:H} = bounds;
+    const sx = (W - (cols-1)*gutterX)/(cols+1);
+    const sy = (H - (rows-1)*gutterY)/(rows+1);
+    const out=[];
+    for(let r=0;r<rows;r++){
+      for(let c=0;c<cols;c++){
+        const px = x + sx*(c+1) + gutterX*c;
+        const py = y + sy*(r+1) + gutterY*r;
+        out.push([px,py]);
+      }
+    }
+    return out;
+  }
+  function chairsAroundCircle(cx,cy,r,count){
+    let s='';
+    for(let k=0;k<count;k++){
+      const ang = (k/count)*Math.PI*2;
+      const px=cx+Math.cos(ang)*(r+26);
+      const py=cy+Math.sin(ang)*(r+26);
+      s+=chair(px,py);
+    }
+    return s;
+  }
+
+  // ---------- helpers to parse counts from random titles ----------
+  function parseCounts(){
+    const m = layout.title && layout.title.match(/(\d+)\s*tables?\s*x\s*(\d+)\s*chairs?/i);
+    if(m) return { tables: Math.max(1,parseInt(m[1],10)), chairsPer: Math.max(1,parseInt(m[2],10)) };
+    // Theater: interpret as rows x seats if matched differently
+    const mt = layout.title && layout.title.match(/(\d+)\s*rows?\s*x\s*(\d+)\s*seats?/i);
+    if(mt) return { rows: Math.max(1,parseInt(mt[1],10)), seats: Math.max(1,parseInt(mt[2],10)) };
+    return { tables: 16, chairsPer: 6 };
+  }
+
+  let content='';
+
+  // ---------- Base and named layouts as single exemplars ----------
+  if(title.includes('home show booth')){
+    // Single 10' x 4' booth exemplar with drapes
+  const aspect = 2.5; // 10:4
+  const fit = fitRectToRoom(aspect, 0.85); // fill ~85% of dominant dimension
+  const bw=fit.W, bd=fit.H;
+    const cx=w/2, cy=h/2-8;
+    // Booth footprint
+    content += `<rect x="${cx-bw/2}" y="${cy-bd/2}" width="${bw}" height="${bd}" rx="8" fill="rgba(210,255,245,.08)" stroke="rgba(210,255,245,.32)"/>`;
+    // Back drape
+    const drapeStroke = 'rgba(200,240,240,.55)';
+    const drapeFill = 'rgba(0,20,24,.35)';
+    const backY = cy - bd/2;
+    content += `<rect x="${cx-bw/2}" y="${backY-5}" width="${bw}" height="10" fill="${drapeFill}" stroke="${drapeStroke}"/>`;
+    // Side drapes
+    content += `<rect x="${cx+bw/2-3}" y="${cy-bd/2}" width="6" height="${bd}" fill="${drapeFill}" stroke="${drapeStroke}"/>`;
+    content += `<rect x="${cx-bw/2-3}" y="${cy-bd/2}" width="6" height="${bd}" fill="${drapeFill}" stroke="${drapeStroke}"/>`;
+  } else if(title.includes('round tables')){
+    // Single round table + one representative chair (to-scale)
+    const minDim = Math.min(roomW, roomH);
+    let r = (minDim * 0.7)/2; // start slightly smaller to allow a chair outside
+    let chairSize = clamp(r*0.28, 26, 64); // ~18" chair vs 60-72" table
+    // Ensure both table + chair fit vertically
+    const totalNeeded = 2*r + chairSize*1.3 + MARGIN*2;
+    const scale = Math.min(1, (minDim*0.94)/totalNeeded);
+    r *= scale; chairSize *= scale;
+    const cx=w/2, cy=h/2-2;
+    content += roundTable(cx,cy,r);
+    const chairOffset = Math.max(14, chairSize*0.8);
+    content += chair(cx, cy - (r+chairOffset), chairSize);
+  } else if(title.includes('conference + stage') || title.includes('classroom')){
+    // Single rectangle table + one representative chair
+    const cx=w/2, cy=h/2-10;
+    const aspect = 170/64; // ~2.65
+    let fit = fitRectToRoom(aspect, 0.82);
+    let chairSize = clamp(fit.H*0.75, 28, 64);
+    // Ensure table + chair fit horizontally
+    const totalW = fit.W + chairSize*1.3 + MARGIN*2;
+    if(totalW > roomW*0.96){
+      const s = (roomW*0.96 - MARGIN*2) / totalW;
+      fit = { W: fit.W*s, H: fit.H*s };
+      chairSize *= s;
+    }
+    content += rectTable(cx,cy,fit.W,fit.H);
+    content += chair(cx + (fit.W/2 + chairSize*0.7), cy, chairSize);
+  } else if(title.includes('empty open room')){
+    // Subtle center mark only
+    content += `<circle cx="${w/2}" cy="${h/2}" r="54" fill="rgba(200,240,240,.05)" stroke="rgba(200,240,240,.16)"/>`;
+  } else if(title.includes('theater')){
+    // Single chair exemplar only
+  const cx=w/2, cy=h/2-8;
+  const size = Math.min(roomW, roomH)*0.6; // fill ~60% so it doesn't clip
+  content += bigChair(cx, cy, size);
+  } else if(title.includes('u-shape')){
+    // Single exemplar: rectangle table segment
+    const cx=w/2, cy=h/2-8;
+    const aspect = 160/48; // ~3.33
+    const fit = fitRectToRoom(aspect, 0.82);
+    content += rectTable(cx,cy,fit.W,fit.H);
+  } else if(title.includes('boardroom')){
+    // Single long table exemplar
+    const cx=w/2, cy=h/2-10;
+    const aspect = 340/70; // ~4.86
+    const fit = fitRectToRoom(aspect, 0.85);
+    content += rectTable(cx,cy,fit.W,fit.H);
+  } else if(title.includes('expo pods') || title.includes('workshop pods') || title.includes('pods') || title.includes('banquet')){
+    // Single pod/round exemplar depending on name
+    const cx=w/2, cy=h/2-6;
+    if(title.includes('banquet')){
+      const minDim = Math.min(roomW, roomH);
+      let r = (minDim * 0.7)/2;
+      let chairSize = clamp(r*0.28, 26, 64);
+      const totalNeeded = 2*r + chairSize*1.3 + MARGIN*2;
+      const scale = Math.min(1, (minDim*0.94)/totalNeeded);
+      r *= scale; chairSize *= scale;
+      content += roundTable(cx,cy,r);
+      const chairOffset = Math.max(14, chairSize*0.8);
+      content += chair(cx, cy - (r+chairOffset), chairSize);
+    } else {
+      const aspect = 104/60; // ~1.73
+      let fit = fitRectToRoom(aspect, 0.82);
+      let chairSize = clamp(fit.H*0.8, 28, 64);
+      const totalW = fit.W + chairSize*1.3 + MARGIN*2;
+      if(totalW > roomW*0.96){
+        const s = (roomW*0.96 - MARGIN*2) / totalW;
+        fit = { W: fit.W*s, H: fit.H*s };
+        chairSize *= s;
+      }
+      content += rectTable(cx,cy,fit.W,fit.H);
+      content += chair(cx + (fit.W/2 + chairSize*0.7), cy, chairSize);
+    }
+  } else {
+    // Generic fallback: one enlarged pod with two chairs
+    const cx=w/2, cy=h/2-4;
+    content += rectTable(cx,cy,110,60);
+    content += chair(cx-60,cy); content += chair(cx+60,cy);
+  }
+
+  return `<svg viewBox="0 0 ${w} ${h}" role="img" aria-label="Room layout preview" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+        <feDropShadow dx="0" dy="0" stdDeviation="2" flood-color="#3b82f6" flood-opacity=".18"/>
+      </filter>
+    </defs>
+    ${room}
+    <g filter="url(#glow)">${content}</g>
+  </svg>`;
+}
+
+function updateFloorUIVisibility(){
+  if(!floorBox) return;
+  const isFloor = (current==='convention_floor' || current==='expo_floor');
+  // Toggle dock panes
+  const dockInfo = document.getElementById('dockInfo');
+  const dockFloor = document.getElementById('dockFloor');
+  if(dockInfo){ dockInfo.style.display = isFloor ? 'none' : 'flex'; dockInfo.style.pointerEvents = isFloor ? 'none':'auto'; }
+  if(dockFloor){ dockFloor.style.display = isFloor ? 'block' : 'none'; dockFloor.style.pointerEvents = isFloor ? 'auto':'none'; }
+  // Ensure dock container is visible at all times on desktop
+  const floorFull = document.getElementById('floorOptions');
+  if(floorFull){
+    floorFull.style.display = isFloor ? 'block' : 'none';
+    // Apply radical variant class
+    if(isFloor){
+      // Default to v3 unless user explicitly forced another
+      const forced = window.__forceFloorVariant;
+      const variant = forced || 3; // v3 compact default
+      ['variant-v1','variant-v2','variant-v3','variant-v4'].forEach(c=>{floorFull.classList.remove(c); document.body.classList.remove('variant-floor-'+c);});
+      floorFull.classList.add('variant-v'+variant);
+      document.body.classList.add('variant-floor-variant-v'+variant);
+      if(variant===2) ensureVariant2Controls(); else removeVariant2Controls();
+    } else {
+      floorFull.classList.remove('variant-v1');
+      document.body.classList.remove('variant-floor-v1');
+      floorFull.classList.remove('variant-v2');
+      document.body.classList.remove('variant-floor-v2');
+      floorFull.classList.remove('variant-v3');
+      document.body.classList.remove('variant-floor-v3');
+    }
+  }
+  // Event popup toggles opposite the floor dock
+  const eventPopup = document.getElementById('eventPopup');
+  if(eventPopup){ eventPopup.style.display = isFloor ? 'none' : 'flex'; }
+  // Keep left column visible; hide old right column
+  const leftCol = document.querySelector('.banner-left');
+  const rightCol = document.querySelector('.banner-right');
+  if(leftCol) leftCol.style.display = 'flex';
+  if(rightCol) rightCol.style.display = 'none';
+  // Info panel inside left panel remains hidden
+  const info = document.getElementById('infoPanel');
+  if(info){ info.style.display = 'none'; }
+  // Initialize floor dots/rendering when entering floor modes
+  if(isFloor){
+    if(!floorDots.children.length) buildDots();
+    renderFloor();
+    document.body.classList.add('floor-config-active');
+  } else {
+    document.body.classList.remove('floor-config-active');
+  }
+}
+
+document.addEventListener('click',(e)=>{
+  const t = e.target.closest && e.target.closest('button');
+  if(!t) return;
+  switch(t.id){
+    case 'prevLayout':
+      console.log('[FLOOR] prevLayout click');
+      setFloorIdx(floorIdx-1); break;
+    case 'nextLayout':
+      console.log('[FLOOR] nextLayout click');
+      setFloorIdx(floorIdx+1); break;
+    case 'exitFloor':
+      console.log('[FLOOR] exitFloor click from', current);
+      if(current==='convention_floor') go('convention');
+      else if(current==='expo_floor') go('expo');
+      break;
+  }
+  if(typeof syncBannerHeight==='function') syncBannerHeight();
+});
+
+// Hide the external menu list on desktop while in floor mode so the panel is dedicated to layouts
+function syncMenuVisibilityForFloor(){
+  const isMobile = window.innerWidth <= 800; // mirrors CSS breakpoint
+  const showFloor = current==='convention_floor';
+  if(!ui) return;
+  // Floor mode visibility handled by updateFloorUIVisibility. Keep defaults here.
+  ui.style.display = '';
+}
+
+// Reset button logic
+const resetBtn = document.getElementById('resetBtn');
+if(resetBtn){ resetBtn.addEventListener('click', ()=>{ resetToIntro(); }); }
+async function resetToIntro(){
+  console.log('[CC] RESET requested');
+  if(isTransitioning && currentTransitionAbort) currentTransitionAbort('reset');
+  queuedDest=null; pendingDest=null;
+  await instantSwitch('intro');
+  persistState('intro');
+  status('Ready');
+}
+
+window.addEventListener('beforeunload',()=>{ console.log('[CC] beforeunload fired (page exiting)'); });
+
+// Banner height is fixed via CSS var --banner-h
+
+// ---------- Time/Date HUD ----------
+function pad(n){return String(n).padStart(2,'0');}
+function fmtTime(d){ const h=d.getHours(), m=d.getMinutes(); return `${h%12||12}:${pad(m)} ${h<12?'AM':'PM'}`; }
+function fmtDate(d){ return d.toLocaleDateString(undefined,{weekday:'short', month:'short', day:'numeric', year:'numeric'}); }
+function updateClock(){ const now=new Date(); const t=document.getElementById('hudTime'); if(t) t.textContent = fmtTime(now); const dd=document.getElementById('hudDate'); if(dd) dd.textContent = fmtDate(now); }
+function initClock(){ updateClock(); const msToNextMin=(60-new Date().getSeconds())*1000+50; setTimeout(()=>{ updateClock(); setInterval(updateClock,60000); }, msToNextMin); }
+function updateHUDVisibility(){ const hud=document.getElementById('hudClock'); if(hud) hud.style.display = ''; }
+
+document.addEventListener('DOMContentLoaded', initClock);
+initClock();
+
+// ---------- Weather (Putnam County) ----------
+// Using Open-Meteo (no key required). Assumption: Putnam County, FL (approx lat/long).
+// Adjust LAT/LON if you intend a different Putnam County (e.g., NY) or make selectable.
+const WEATHER_CFG = {
+  lat: 29.65, // Putnam County, Florida approx center
+  lon: -81.74,
+  refreshMs: 10 * 60 * 1000, // update every 10 minutes
+};
+const WEATHER_CODE_MAP = {
+  0:'Clear',1:'Mainly Clear',2:'Partly Cloudy',3:'Cloudy',45:'Fog',48:'Fog',51:'Drizzle',53:'Drizzle',55:'Drizzle',56:'Freezing Drizzle',57:'Freezing Drizzle',61:'Rain',63:'Rain',65:'Heavy Rain',66:'Freezing Rain',67:'Freezing Rain',71:'Snow',73:'Snow',75:'Heavy Snow',77:'Snow Grains',80:'Showers',81:'Showers',82:'Heavy Showers',85:'Snow Showers',86:'Snow Showers',95:'Thunderstorm',96:'Thunderstorm',99:'Thunderstorm'};
+function weatherIconFor(code, isDay){
+  const base = WEATHER_CODE_MAP[code] || '—';
+  // Simple icon set using emojis for clarity; can be replaced with SVG later.
+  if([0].includes(code)) return isDay ? '☀️' : '🌙';
+  if([1,2].includes(code)) return isDay ? '🌤️' : '🌥️';
+  if(code===3) return '☁️';
+  if([45,48].includes(code)) return '🌫️';
+  if([51,53,55,61,63,65,80,81,82].includes(code)) return '🌧️';
+  if([66,67].includes(code)) return '🌨️';
+  if([71,73,75,77,85,86].includes(code)) return '❄️';
+  if([95,96,99].includes(code)) return '⛈️';
+  return base.charAt(0) || '…';
+}
+async function fetchWeather(){
+  const iconEl = document.getElementById('hudWeatherIcon');
+  const tempEl = document.getElementById('hudWeatherTemp');
+  const condEl = document.getElementById('hudWeatherCond');
+  const wrap = document.getElementById('hudWeather');
+  if(!iconEl||!tempEl||!condEl) return;
+  try{
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${WEATHER_CFG.lat}&longitude=${WEATHER_CFG.lon}&current=temperature_2m,weather_code,is_day&temperature_unit=fahrenheit&timezone=auto`;
+    const resp = await fetch(url, { cache:'no-store' });
+    if(!resp.ok) throw new Error('HTTP '+resp.status);
+    const data = await resp.json();
+    const cur = data.current;
+    if(cur){
+      const temp = Math.round(cur.temperature_2m);
+      const code = cur.weather_code;
+      const cond = WEATHER_CODE_MAP[code] || 'Weather';
+      const icon = weatherIconFor(code, !!cur.is_day);
+      iconEl.textContent = icon;
+      tempEl.textContent = temp + '°F';
+      condEl.textContent = cond;
+      if(wrap) wrap.setAttribute('aria-label', `Current weather: ${cond}, ${temp} degrees Fahrenheit`);
+    } else {
+      throw new Error('Missing current weather');
+    }
+  }catch(e){
+    console.warn('[WEATHER] failed', e);
+    if(iconEl) iconEl.textContent = '—';
+    if(tempEl) tempEl.textContent = '--°';
+    if(condEl) condEl.textContent = 'Unavailable';
+    if(wrap) wrap.setAttribute('aria-label','Weather unavailable');
+  }
+}
+function scheduleWeather(){
+  fetchWeather();
+  setInterval(fetchWeather, WEATHER_CFG.refreshMs);
+}
+document.addEventListener('DOMContentLoaded', scheduleWeather);
+
+// ---------- Dynamic left navigation vertical offset ----------
+function computeNavOffset(){
+  const header = document.querySelector('header');
+  const footer = document.querySelector('footer');
+  const root = document.documentElement;
+  const nav = document.getElementById('ui');
+  if(!header || !footer || !nav) return;
+  // Measure natural height
+  const listHeight = nav.scrollHeight;
+  const headerRect = header.getBoundingClientRect();
+  const footerRect = footer.getBoundingClientRect();
+  const topBoundary = headerRect.bottom + 16; // 16px gap below header
+  const bottomBoundary = footerRect.top - 16; // 16px gap above footer
+  const available = bottomBoundary - topBoundary;
+  let top = topBoundary;
+  if(listHeight < available){
+    top = topBoundary + (available - listHeight)/2; // center within bounds
+  }
+  // Clamp just in case
+  const minTop = topBoundary;
+  const maxTop = bottomBoundary - listHeight;
+  if(top < minTop) top = minTop;
+  if(top > maxTop) top = maxTop;
+  root.style.setProperty('--nav-offset', Math.round(top) + 'px');
+  root.style.setProperty('--scrim-top', Math.round(topBoundary) + 'px');
+  const scrimBottomGap = Math.max(0, window.innerHeight - bottomBoundary + 0);
+  root.style.setProperty('--scrim-bottom-gap', Math.round(scrimBottomGap) + 'px');
+}
+window.addEventListener('resize', ()=>{ if(window.__navOfRaf) cancelAnimationFrame(window.__navOfRaf); window.__navOfRaf = requestAnimationFrame(computeNavOffset); });
+document.addEventListener('DOMContentLoaded', ()=>{
+  computeNavOffset();
+  if(document.fonts && document.fonts.ready){ document.fonts.ready.then(()=>setTimeout(computeNavOffset,50)); }
+  setTimeout(computeNavOffset,150); // extra pass after potential async layout shifts
+  setTimeout(computeNavOffset,500); // adjust after dynamic font scaling changes
+});
+computeNavOffset();
+
+// ---------- Event popup slideshow ----------
+const EVENTS = [
+  { title:'Saints Dark Coffee', tag:'Convention Center', desc:'Small-batch roastery pop-up featuring limited origin espresso and seasonal pastries. Visit us on the main concourse.', distance:'110 m', hours:'9:00–5:00', spot:'Booth A127', hero:'https://picsum.photos/seed/cc-coffee/800/1000' },
+  { title:'Robotics Makerspace', tag:'Expo Center', desc:'Hands-on demos of student-built robots and interactive STEM exhibits. Family friendly.', distance:'240 m', hours:'10:00–6:00', spot:'Hall C • E214', hero:'https://picsum.photos/seed/cc-robotics/800/1000' },
+  { title:'Food Truck Rally', tag:'Midway', desc:'Local trucks featuring tacos, BBQ, and vegan options. Live DJ 12–2 PM.', distance:'350 m', hours:'11:00–8:00', spot:'Lot M2', hero:'https://picsum.photos/seed/cc-foodtruck/800/1000' },
+  { title:'Summer Concert Series', tag:'Ampitheatre', desc:'Outdoor performance featuring regional artists. Lawn seating—blankets encouraged.', distance:'480 m', hours:'7:00–9:30', spot:'Main Stage', hero:'https://picsum.photos/seed/cc-concert/800/1000' },
+  { title:'Art & Craft Fair', tag:'Pavilion', desc:'Juried makers and artisans with booths across the pavilion. Workshops hourly.', distance:'220 m', hours:'10:00–4:00', spot:'Row A • P104', hero:'https://picsum.photos/seed/cc-craft/800/1000' },
+];
+
+let eventIdx = 0;
+let eventTimer = null;
+function renderEvent(i){
+  const e = EVENTS[i % EVENTS.length];
+  const hero = document.getElementById('eventHero');
+  const tag = document.getElementById('eventTag');
+  const title = document.getElementById('eventTitle');
+  const desc = document.getElementById('eventDesc');
+  const dist = document.getElementById('eventDistance');
+  const hours = document.getElementById('eventHours');
+  const spot = document.getElementById('eventSpot');
+  if(hero) hero.style.backgroundImage = `url('${e.hero}')`;
+  if(tag) tag.textContent = e.tag;
+  if(title) title.textContent = e.title;
+  if(desc) desc.textContent = e.desc;
+  if(dist) dist.textContent = e.distance;
+  if(hours) hours.textContent = e.hours;
+  if(spot) spot.textContent = e.spot;
+}
+
+function startEventSlideshow(){
+  stopEventSlideshow();
+  renderEvent(eventIdx);
+  eventTimer = setInterval(()=>{ eventIdx = (eventIdx+1)%EVENTS.length; renderEvent(eventIdx); }, 5000);
+}
+function stopEventSlideshow(){ if(eventTimer){ clearInterval(eventTimer); eventTimer=null; } }
+function syncEventSlideshow(){
+  const isFloor = (current==='convention_floor' || current==='expo_floor');
+  const popup = document.getElementById('eventPopup');
+  if(!popup) return;
+  const isHidden = window.getComputedStyle(popup).display === 'none';
+  if(isFloor || isHidden){ stopEventSlideshow(); }
+  else { startEventSlideshow(); }
+}
+document.addEventListener('DOMContentLoaded', ()=>{ 
+  // Preload hero images for smoother first swaps
+  try{ EVENTS.forEach(e=>{ const i=new Image(); i.crossOrigin='anonymous'; i.src=e.hero; }); }catch{}
+  // Render first event immediately so an image is visible even if slideshow is paused
+  try{ renderEvent(0); }catch{}
+  setTimeout(syncEventSlideshow, 100); 
+  // Attach floor plan control handlers explicitly (in case delegation misses due to layering)
+  const prevBtn = document.getElementById('prevLayout');
+  const nextBtn = document.getElementById('nextLayout');
+  const exitBtn = document.getElementById('exitFloor');
+  if(prevBtn) prevBtn.addEventListener('click', ()=> setFloorIdx(floorIdx-1));
+  if(nextBtn) nextBtn.addEventListener('click', ()=> setFloorIdx(floorIdx+1));
+  if(exitBtn) exitBtn.addEventListener('click', ()=> {
+    if(current==='convention_floor') go('convention');
+    else if(current==='expo_floor') go('expo');
+  });
+});
+
+// Variant engine scaffold (will expand for additional radical redesigns)
+let floorVariant = 3; // start at compact v3
+function cycleFloorVariant(){
+  const AVAILABLE = [3,1,2]; // cycle order: compact -> v1 -> v2
+  const idx = AVAILABLE.indexOf(floorVariant);
+  floorVariant = AVAILABLE[(idx+1)%AVAILABLE.length];
+  const box = document.getElementById('floorOptions');
+  if(!box) return;
+  // Remove all known variant classes
+  ['variant-v1','variant-v2','variant-v3','variant-v4'].forEach(c=>box.classList.remove(c));
+  document.body.classList.remove('variant-floor-variant-v1','variant-floor-variant-v2','variant-floor-variant-v3','variant-floor-variant-v4');
+  const cls = 'variant-v'+floorVariant;
+  box.classList.add(cls);
+  document.body.classList.add('variant-floor-'+cls,'variant-floor-variant-v'+floorVariant);
+  console.log('[FLOOR][VARIANT] switched to', cls);
+  window.__forceFloorVariant = floorVariant; // persist until exit
+  if(floorVariant===2){ ensureVariant2Controls(); } else { removeVariant2Controls(); }
+}
+
+// Expose for manual console testing
+window.cycleFloorVariant = cycleFloorVariant;
+
+// Variant 2: create radial floating prev/exit/next buttons if not present
+function ensureVariant2Controls(){
+  const box=document.getElementById('floorOptions');
+  if(!box || !box.classList.contains('variant-v2')) return;
+  if(box.querySelector('.radial-stack')) return; // already inserted
+  const stack=document.createElement('div');
+  stack.className='radial-stack floor-bottom-bar';
+  stack.innerHTML = `
+    <button class="radial-btn" data-role="prev" aria-label="Previous Layout">‹<span class='radial-btn-label'>Prev</span></button>
+    <button class="radial-btn" data-role="exit" aria-label="Exit Floor Plan">×<span class='radial-btn-label'>Exit</span></button>
+    <button class="radial-btn" data-role="next" aria-label="Next Layout">›<span class='radial-btn-label'>Next</span></button>
+  `;
+  const panel = box.querySelector('.floor-panel');
+  if(panel){ panel.appendChild(stack); }
+  stack.addEventListener('click', e=>{
+    const btn=e.target.closest('.radial-btn'); if(!btn) return;
+    const role=btn.getAttribute('data-role');
+    if(role==='prev') setFloorIdx(floorIdx-1);
+    else if(role==='next') setFloorIdx(floorIdx+1);
+    else if(role==='exit'){
+      if(current==='convention_floor') go('convention');
+      else if(current==='expo_floor') go('expo');
+    }
+  });
+}
+function removeVariant2Controls(){
+  document.querySelectorAll('.radial-stack').forEach(n=>n.remove());
+}
+</script>
 </body>
 </html>
