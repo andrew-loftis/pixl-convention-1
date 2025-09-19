@@ -742,11 +742,12 @@ async function init(){
     try{ await preloadAllVideos(); }catch(e){ console.warn('[CC][PRELOAD] failed', e); }
   }
   await loadLoop(states[current].loop);
-  try { await active.play(); } catch(e) {}
+  await ensurePlayback(active, 'init');
   setState(current);
   disableUI(false);
   status('Ready');
   updateMobileContain();
+  await waitFirstFrame(active, 4000);
   showPreloadOverlay(false);
 }
 
@@ -1118,7 +1119,7 @@ async function instantSwitch(dest){
       active.loop = true;
       try{ active.removeAttribute('poster'); }catch{}
       await waitReady(active);
-      try { await active.play(); } catch(e) {}
+      await ensurePlayback(active, 'instantSwitch');
     } catch(e){ console.warn('[CC] instantSwitch play issue', e); }
     try { document.getElementById('stage').removeChild(tmp); } catch(e) {}
     current = dest;
@@ -1173,7 +1174,7 @@ function playTransition(viaFile, destLoop, destId){
         const resolvedDest = await resolveLoopFilename(destLoop);
         buffer.src=base+resolvedDest; buffer.loop=true; applyPoster(buffer,resolvedDest);
       }
-  try { active.src = buffer.src; active.loop = true; try{ active.removeAttribute('poster'); }catch{} await waitReady(active,'finalizeLoop'); try{ await active.play(); }catch(e){} } catch(e){ console.warn('[CC] loop swap issue', e); }
+  try { active.src = buffer.src; active.loop = true; try{ active.removeAttribute('poster'); }catch{} await waitReady(active,'finalizeLoop'); await ensurePlayback(active,'finalizeLoop'); } catch(e){ console.warn('[CC] loop swap issue', e); }
       next.style.transition='opacity .35s ease';
       requestAnimationFrame(()=>{ next.style.opacity='0'; });
       setTimeout(()=>{ try{ next.pause(); next.removeAttribute('src'); next.load(); }catch(e){} persistState(destId); resolve(); },380);
@@ -1321,6 +1322,31 @@ window.addEventListener('resize',()=>{
 function disableUI(flag){
   Array.from(ui.querySelectorAll('button')).forEach(b=>b.disabled=flag);
   status(flag?'Busy...':'Ready');
+}
+
+// Attempt to start and sustain playback briefly
+async function ensurePlayback(videoEl, label){
+  try{ videoEl.muted = true; }catch{}
+  let attempts = 0;
+  const maxAttempts = 10; // ~3s total
+  while(attempts++ < maxAttempts){
+    try{ await videoEl.play(); }catch{}
+    if(!videoEl.paused || videoEl.currentTime > 0.05) break;
+    await new Promise(r=>setTimeout(r,300));
+  }
+}
+
+// Wait for a real first frame on screen
+async function waitFirstFrame(videoEl, timeoutMs){
+  const start = performance.now();
+  return new Promise(resolve=>{
+    const check=()=>{
+      const ok = (videoEl.readyState>=2 && videoEl.currentTime>0.05 && videoEl.videoWidth>0);
+      if(ok || (performance.now()-start)>timeoutMs){ return resolve(); }
+      requestAnimationFrame(check);
+    };
+    check();
+  });
 }
 
 function status(msg){ statusEl.textContent = msg; }
