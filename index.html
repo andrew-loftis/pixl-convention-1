@@ -13,7 +13,9 @@
   --accent-glow:0 0 6px rgba(59,130,246,.55);
   --accent-glow-strong:0 0 14px rgba(59,130,246,.55),0 0 28px rgba(59,130,246,.35);
 }
+html{ background:#000; }
 body{margin:0;font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;line-height:1.4;background:#0b1118;color:#e9edf4;display:flex;flex-direction:column;min-height:100vh;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;}
+*{ -webkit-tap-highlight-color: rgba(0,0,0,0); }
 header,footer{padding:.55rem .9rem;font-size:.65rem;letter-spacing:.5px;background:#0e1626;border-bottom:1px solid #1c2b45;}
 footer{border-top:1px solid #1c2b45;border-bottom:none;margin-top:auto;color:#9db0c7;}
 #stage{position:relative;flex:1;display:flex;overflow:hidden;background:#000;} 
@@ -23,10 +25,14 @@ video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;backgrou
 #next{z-index:2;}
 #buffer{z-index:0;}
 #next,#buffer{opacity:0;pointer-events:none;}
+#active,#next,#buffer{background:#000 !important;}
 .fade-in{animation:fade .4s ease forwards;}
 @keyframes fade{from{opacity:0}to{opacity:1}}
 /* Left-to-right dark gradient overlay for better left-side readability */
 .stage-overlay{position:absolute;inset:0;pointer-events:none;background:linear-gradient(90deg, rgba(6,10,18,.68) 0%, rgba(6,10,18,.42) 18%, rgba(6,10,18,.18) 32%, rgba(6,10,18,0) 48%);z-index:3;}
+/* Short-lived black overlay to mask Pi compositor white flashes during transitions */
+#xfadeGuard{position:fixed;inset:0;background:#000;opacity:0;transition:opacity .12s ease;pointer-events:none;z-index:40;}
+#xfadeGuard.show{opacity:.08;}
 /* Connected horizontal button rail */
 /* Left-side glass panel ------------------------------------------------------- */
 #panel{position:fixed;top:0;bottom:0;left:0;width:var(--panel-w);height:100vh;display:flex;flex-direction:column;gap:.6rem;padding:1rem .9rem;background:transparent;border:0;box-shadow:none;z-index:6;overflow:visible;pointer-events:none;}
@@ -260,6 +266,11 @@ body.floor-config-active #ui .inline-floor-panel.exit-inline button:hover{color:
 @media (max-width:800px){ .hud-weather{display:none;} }
 @media (max-width:800px){ .hud-clock{display:none;} }
 
+/* Hide scrollbars during transition to avoid white gutter flashes */
+body.transitioning *{ scrollbar-color: rgba(0,0,0,0) rgba(0,0,0,0); }
+body.transitioning ::-webkit-scrollbar{ width:0 !important; height:0 !important; background:transparent !important; }
+body.transitioning *:focus{ outline: none !important; }
+
 /* Mobile "app bar" layout */
 @media (max-width:800px){
   #ui{position:fixed;bottom:0;left:0;right:0;transform:none;flex-direction:row;justify-content:center;align-items:stretch;padding:0;background:#000;border:0;border-top:1px solid #111a1d;border-radius:0;box-shadow:0 -2px 12px -4px rgba(0,0,0,.85);gap:0;}
@@ -302,6 +313,22 @@ video {
   /* Ensure smooth playback */
   -webkit-filter: blur(0);
   filter: blur(0);
+}
+
+/* During transitions, temporarily disable costly backdrop-filter to prevent white tile flashes on Pi */
+body.transitioning *{
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+body.transitioning .modal .content,
+body.transitioning .evt-card,
+body.transitioning #panel,
+body.transitioning .ui-scrim,
+body.transitioning .hud-clock,
+body.transitioning .tool-btn,
+body.transitioning #floorOptions{
+  background: rgba(0,0,0,.55) !important;
+  box-shadow: none !important;
 }
 
 /* Ensure black background is always visible during transitions */
@@ -419,6 +446,7 @@ video {
   <video id="next" playsinline muted preload="metadata"></video>
   <video id="buffer" playsinline muted preload="metadata"></video>
   <div class="stage-overlay" aria-hidden="true"></div>
+  <div id="xfadeGuard" aria-hidden="true"></div>
   <div id="panel">
     <div class="panel-header">Navigation</div>
     <div class="banner-head">
@@ -988,6 +1016,8 @@ async function go(dest){
   }
   console.log('[CC][GO] transition asset found', from,'->',dest,'file=',transFile,'floorExit=',isFloorExit);
   isTransitioning = true;
+  document.body.classList.add('transitioning');
+  document.getElementById('xfadeGuard')?.classList.add('show');
   pendingDest = dest;
   queuedDest = null;
   // Preview: show Exit immediately in left nav while entering floor
@@ -1023,6 +1053,8 @@ async function go(dest){
   current = pendingDest;
   pendingDest = null;
   isTransitioning = false;
+  document.body.classList.remove('transitioning');
+  document.getElementById('xfadeGuard')?.classList.remove('show');
   if(queuedDest && queuedDest !== current){
     const nextDest = queuedDest; queuedDest=null;
     setTimeout(()=>go(nextDest),0);
@@ -1044,6 +1076,8 @@ async function instantSwitch(dest){
   queuedDest = null;
   pendingDest = null;
   isTransitioning = true;
+  document.body.classList.add('transitioning');
+  document.getElementById('xfadeGuard')?.classList.add('show');
   status('Switching...');
   const newLoop = states[dest].loop;
   const resolved = await resolveLoopFilename(newLoop);
@@ -1099,6 +1133,8 @@ async function instantSwitch(dest){
     current = dest;
     setState(dest);
     isTransitioning = false;
+    document.body.classList.remove('transitioning');
+    document.getElementById('xfadeGuard')?.classList.remove('show');
     status('Ready');
   }, 700); // longer timeout for Pi reliability
 }
@@ -1150,7 +1186,11 @@ function playTransition(viaFile, destLoop, destId){
       try { active.src = buffer.src; active.loop = true; applyPoster(active, destLoop); await waitReady(active,'finalizeLoop'); try{ await active.play(); }catch(e){} } catch(e){ console.warn('[CC] loop swap issue', e); }
       next.style.transition='opacity .35s ease';
       requestAnimationFrame(()=>{ next.style.opacity='0'; });
-      setTimeout(()=>{ try{ next.pause(); next.removeAttribute('src'); next.load(); }catch(e){} persistState(destId); resolve(); },380);
+      setTimeout(()=>{ try{ next.pause(); next.removeAttribute('src'); next.load(); }catch(e){} persistState(destId); resolve();
+        // clear transition guard
+        document.body.classList.remove('transitioning');
+        document.getElementById('xfadeGuard')?.classList.remove('show');
+      },380);
     }
     function handleEnded(){ endedFired=true; if(timeCheckInterval) clearInterval(timeCheckInterval); console.log('[CC][TRANS] ended', viaFile); finalize('ended'); }
     next.addEventListener('error',()=>finalize('error'),{once:true});
