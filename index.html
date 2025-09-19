@@ -16,8 +16,9 @@
 body{margin:0;font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;line-height:1.4;background:#0b1118;color:#e9edf4;display:flex;flex-direction:column;min-height:100vh;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;}
 header,footer{padding:.55rem .9rem;font-size:.65rem;letter-spacing:.5px;background:#0e1626;border-bottom:1px solid #1c2b45;}
 footer{border-top:1px solid #1c2b45;border-bottom:none;margin-top:auto;color:#9db0c7;}
-#stage{position:relative;flex:1;display:flex;overflow:hidden;} 
-video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#000;}
+#stage{position:relative;flex:1;display:flex;overflow:hidden;background:#000;} 
+#stage-backdrop{position:absolute;inset:0;background:#000;z-index:-1;}
+video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#000;will-change:opacity;transform:translateZ(0);-webkit-backface-visibility:hidden;backface-visibility:hidden;}
 #active{z-index:1;}
 #next{z-index:2;}
 #buffer{z-index:0;}
@@ -283,6 +284,31 @@ body.floor-config-active #ui .inline-floor-panel.exit-inline button:hover{color:
 /* Crossfade for instant (no transition file) switches */
 #active.crossfade-enter{opacity:0;transition:opacity .4s ease;}
 #active.crossfade-enter.crossfade-show{opacity:1;}
+
+/* Raspberry Pi optimizations */
+video {
+  /* Force hardware acceleration on Pi */
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  /* Prevent flicker during transitions */
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
+  /* Ensure smooth playback */
+  -webkit-filter: blur(0);
+  filter: blur(0);
+}
+
+/* Ensure black background is always visible during transitions */
+#stage::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: #000;
+  z-index: -2;
+}
 /* (footer removed; status now floats bottom-right) */
 
 /* ---------- Info panel styles (banner-right) ---------- */
@@ -314,9 +340,10 @@ body.floor-config-active #ui .inline-floor-panel.exit-inline button:hover{color:
 <body>
 <header>Convention Center Navigator <span class="badge">Beta</span></header>
 <div id="stage">
-  <video id="active" playsinline muted></video>
-  <video id="next" playsinline muted></video>
-  <video id="buffer" playsinline muted></video>
+  <div id="stage-backdrop"></div>
+  <video id="active" playsinline muted preload="auto"></video>
+  <video id="next" playsinline muted preload="metadata"></video>
+  <video id="buffer" playsinline muted preload="metadata"></video>
   <div class="stage-overlay" aria-hidden="true"></div>
   <div id="panel">
     <div class="panel-header">Navigation</div>
@@ -963,7 +990,7 @@ function playTransition(viaFile, destLoop, destId){
       if(firstFrameShown) return;
       firstFrameShown=true;
       console.log('[CC][TRANS] showFirstFrame', viaFile, 't=', next.currentTime.toFixed(2));
-      next.style.transition='opacity .15s ease'; // faster fade to mask prior loop flash
+      next.style.transition='opacity .2s ease'; // slightly slower fade for better Pi performance
       next.style.opacity='1';
       try{ active.pause(); }catch(e){}
     }
@@ -982,17 +1009,23 @@ function playTransition(viaFile, destLoop, destId){
     }
     function handleEnded(){ endedFired=true; if(timeCheckInterval) clearInterval(timeCheckInterval); console.log('[CC][TRANS] ended', viaFile); finalize('ended'); }
     next.addEventListener('error',()=>finalize('error'),{once:true});
-    // Legacy frame-detect listeners retained as safety but we will now force early reveal right after play() below
+    // Legacy frame-detect listeners retained as safety - wait for actual frame data on Pi
     let frameCheckCount=0;
     function onProgress(){
-      if(next.currentTime>0 || next.readyState>=2){ showFirstFrame(); next.removeEventListener('timeupdate',onProgress); next.removeEventListener('playing',onProgress); }
+      if(next.currentTime>0 || next.readyState>=3){ showFirstFrame(); next.removeEventListener('timeupdate',onProgress); next.removeEventListener('playing',onProgress); }
       else if(frameCheckCount++>40){ showFirstFrame(); }
     }
     next.addEventListener('timeupdate',onProgress);
     next.addEventListener('playing',onProgress);
+    next.addEventListener('canplay',onProgress); // Additional trigger for Pi compatibility
     try{ await next.play(); }catch(e){ console.warn('[CC] next.play fail',e,'-> instant fallback'); finalize('play-fail'); return; }
-    // NEW: show overlay immediately (do not wait for frame decode) to avoid underlying loop flash
-    showFirstFrame();
+    // Modified: Wait for canplay before showing overlay for better Pi performance
+    if(next.readyState >= 3 || next.currentTime > 0) {
+      showFirstFrame();
+    } else {
+      // Fallback timeout for slow loading on Pi
+      setTimeout(() => { if(!firstFrameShown) showFirstFrame(); }, 200);
+    }
     timeCheckInterval = setInterval(()=>{ if(next.duration && next.currentTime >= next.duration && !endedFired){ handleEnded(); } },100);
     setTimeout(()=>{ if(!finalized && !endedFired){ console.warn('[CC] watchdog finalize (no ended)', viaFile); finalize('watchdog'); } },60000);
   });
