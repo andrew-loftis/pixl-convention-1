@@ -20,9 +20,7 @@ header,footer{padding:.55rem .9rem;font-size:.65rem;letter-spacing:.5px;backgrou
 footer{border-top:1px solid #1c2b45;border-bottom:none;margin-top:auto;color:#9db0c7;}
 #stage{position:relative;flex:1;display:flex;overflow:hidden;background:#000;} 
 #stage-backdrop{position:absolute;inset:0;background:#000;z-index:-1;}
-/* Persistent black cover always under video layers */
-#stage::after{content:"";position:absolute;inset:0;background:#000;z-index:-1;}
-video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#000;will-change:opacity;transform:translateZ(0);-webkit-backface-visibility:hidden;backface-visibility:hidden;contain:paint;}
+video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#000;will-change:opacity;transform:translateZ(0);-webkit-backface-visibility:hidden;backface-visibility:hidden;}
 #active{z-index:1;}
 #next{z-index:2;}
 #buffer{z-index:0;}
@@ -321,7 +319,11 @@ video {
   filter: blur(0);
 }
 
-/* Removed global backdrop-filter toggle during transitions to avoid compositor resets on Pi */
+/* During transitions, temporarily disable costly backdrop-filter to prevent white tile flashes on Pi */
+body.transitioning *{
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
 
 /* Ensure black background is always visible during transitions */
 #stage::before {
@@ -1146,7 +1148,7 @@ async function instantSwitch(dest){
       await waitReady(active);
       try { await active.play(); } catch(e) {}
     } catch(e){ console.warn('[CC] instantSwitch play issue', e); }
-  try { document.getElementById('stage').removeChild(tmp); } catch(e) {}
+    try { document.getElementById('stage').removeChild(tmp); } catch(e) {}
     current = dest;
     setState(dest);
     isTransitioning = false;
@@ -1213,7 +1215,7 @@ function playTransition(viaFile, destLoop, destId){
       try { active.src = buffer.src; active.loop = true; applyPoster(active, destLoop); await waitReady(active,'finalizeLoop'); try{ await active.play(); }catch(e){} } catch(e){ console.warn('[CC] loop swap issue', e); }
       next.style.transition='opacity .35s ease';
       requestAnimationFrame(()=>{ next.style.opacity='0'; });
-      setTimeout(()=>{ try{ next.pause(); /* keep src to avoid white clear on Pi */ next.style.visibility='hidden'; next.style.opacity='0'; }catch(e){} persistState(destId); resolve();
+      setTimeout(()=>{ try{ next.pause(); next.removeAttribute('src'); next.load(); }catch(e){} persistState(destId); resolve();
         // clear transition guard
         document.body.classList.remove('transitioning');
         document.getElementById('xfadeGuard')?.classList.remove('show');
