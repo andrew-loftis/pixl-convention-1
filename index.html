@@ -346,32 +346,29 @@ body.transitioning *{
 /* ---------- Info panel styles (banner-right) ---------- */
 .info-panel{display:none;}
 
-/* Bottom-right event popup card (slideshow) — compact sizing */
+/* Bottom-right event popup card (slideshow) — smaller, shorter */
 .event-popup{
-  position:fixed;right:24px;bottom:24px;z-index:8;display:flex;flex-direction:row;gap:.5rem;align-items:stretch;
-  width:clamp(360px, 26vw, 520px) !important;
-  aspect-ratio:16/9;
-  border-radius:12px;
-  background:rgba(12,16,24,.9);
+  position:fixed;right:18px;bottom:18px;z-index:8;display:flex;flex-direction:row;gap:.45rem;align-items:stretch;
+  width:clamp(240px, 20vw, 360px) !important;
+  height:clamp(120px, 18vh, 180px) !important; /* shorter so it blocks less */
+  border-radius:10px;
+  background:rgba(12,16,24,.86);
   border:1px solid rgba(255,255,255,.08);
   box-shadow:0 12px 28px -18px rgba(0,0,0,.7), 0 0 0 1px rgba(255,255,255,.03) inset;
-  padding:.55rem .6rem;
+  padding:.5rem .55rem .6rem;
   overflow:hidden;
 }
-@media (max-height:700px){
-  .event-popup{aspect-ratio:auto;min-height:clamp(180px, 28vh, 280px) !important;}
-}
-.event-body{flex:1 1 50%;min-width:0;display:flex;flex-direction:column;gap:.28rem;padding:.1rem .1rem;color:#dbe7ff;animation:textPop .6s ease both;}
+.event-body{flex:1 1 54%;min-width:0;display:flex;flex-direction:column;gap:.24rem;padding:.05rem .06rem;color:#dbe7ff;animation:textPop .6s ease both;}
 .event-hero{
-  position:relative;flex:1 1 50%;min-width:0;min-height:0;
-  border-radius:10px;background:#0f1728 center/contain no-repeat;border:0;overflow:hidden;animation:imgFade .8s ease both;
+  position:relative;flex:1 1 46%;min-width:0;min-height:0;
+  border-radius:8px;background:#0f1728 center/contain no-repeat;border:0;overflow:hidden;animation:imgFade .8s ease both;
 }
 .event-hero::after{display:none}
-.event-title{font-weight:850;font-size:.84rem;color:#fff;letter-spacing:.14px;line-height:1.22;margin-bottom:.06rem;}
-.event-tag{align-self:flex-start;background:var(--accent-soft);color:#d6e9ff;border:1px solid var(--accent-soft-border);font-size:.48rem;font-weight:700;letter-spacing:.25px;padding:.12rem .36rem;border-radius:999px;}
-.event-meta{display:flex;flex-wrap:wrap;gap:.35rem;color:#bcd0e6;font-size:.5rem;opacity:.95;}
-.event-desc{color:#cfe3e6;font-size:.5rem;line-height:1.3;opacity:.95;}
-.event-cta{position:absolute;right:.6rem;bottom:.6rem;height:30px;padding:0 .7rem;border-radius:10px;background:#f3e4d6;color:#1b1b1b;font-weight:800;letter-spacing:.25px;display:flex;align-items:center;justify-content:center;border:1px solid rgba(0,0,0,.08);box-shadow:0 6px 18px -14px rgba(0,0,0,.6), inset 0 0 0 1px rgba(255,255,255,.12);cursor:pointer;font-size:.62rem;}
+.event-title{font-weight:850;font-size:.74rem;color:#fff;letter-spacing:.12px;line-height:1.18;margin-bottom:.04rem;}
+.event-tag{align-self:flex-start;background:var(--accent-soft);color:#d6e9ff;border:1px solid var(--accent-soft-border);font-size:.44rem;font-weight:700;letter-spacing:.25px;padding:.08rem .28rem;border-radius:999px;}
+.event-meta{display:flex;flex-wrap:wrap;gap:.28rem;color:#bcd0e6;font-size:.48rem;opacity:.95;}
+.event-desc{color:#cfe3e6;font-size:.48rem;line-height:1.28;opacity:.95;display:-webkit-box;-webkit-line-clamp:2;line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.event-cta{position:absolute;right:.65rem;bottom:.65rem;height:26px;padding:0 .6rem;border-radius:6px;background:#f3e4d6;color:#1b1b1b;font-weight:800;letter-spacing:.25px;display:flex;align-items:center;justify-content:center;border:1px solid rgba(0,0,0,.08);box-shadow:0 6px 18px -14px rgba(0,0,0,.6), inset 0 0 0 1px rgba(255,255,255,.12);cursor:pointer;font-size:.58rem;}
 
 /* Animations for image fade and text pop */
 @keyframes imgFade { from { opacity:.0 } to { opacity:1 } }
@@ -383,7 +380,7 @@ body.transitioning *{
 .modal .backdrop{position:absolute;inset:0;background:rgba(0,0,0,.55);backdrop-filter:blur(8px);} 
 .modal .content{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
   width:min(980px,78vw);height:min(760px,82vh);
-  border-radius:22px;
+  border-radius:10px;
   background:
     linear-gradient(135deg, rgba(255,255,255,.08), rgba(255,255,255,.05) 60%, rgba(255,255,255,.035)),
     radial-gradient(1200px 600px at 10% 0%, rgba(255,255,255,.06), transparent 60%),
@@ -393,35 +390,37 @@ body.transitioning *{
   backdrop-filter:blur(20px) saturate(190%);
   -webkit-backdrop-filter:blur(18px) saturate(180%);
   display:flex;flex-direction:column;overflow:hidden;
+  /* inner safety padding so buttons don't clip the rounded border */
+  padding:.75rem;
 }
-.ev-head{display:flex;align-items:center;justify-content:space-between;gap:.6rem;padding:.8rem 1rem;border-bottom:1px solid rgba(255,255,255,.08);}
+.ev-head{display:flex;align-items:center;justify-content:space-between;gap:.6rem;padding:.8rem 1rem;border-bottom:1px solid rgba(255,255,255,.08);} 
 .ev-title{font-weight:800;letter-spacing:.3px;}
 .ev-actions{display:flex;gap:.4rem;}
-.cal-close{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#fff;border-radius:10px;padding:.35rem .7rem;cursor:pointer;}
+.cal-close{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#fff;border-radius:6px;padding:.35rem .7rem;cursor:pointer;}
 .ev-wrap{flex:1;display:flex;flex-direction:column;min-height:0;background:linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));}
-.evt-list{flex:1;padding:.95rem;display:flex;flex-direction:column;gap:.8rem;overflow:auto;}
-.evt-card{border:1px solid rgba(255,255,255,.16);border-radius:16px;background:rgba(12,16,24,.34);box-shadow:0 12px 28px -18px rgba(0,0,0,.65), 0 0 0 1px rgba(255,255,255,.05) inset;backdrop-filter:blur(12px) saturate(170%);
-  display:flex;flex-direction:column;overflow:hidden;cursor:pointer;transition:height .38s ease, box-shadow .22s ease, background .28s ease, border-color .28s ease;will-change:height;}
-.evt-card:hover{box-shadow:0 10px 26px -18px rgba(0,0,0,.55);} 
-.evt-card[aria-expanded="true"]{background:rgba(255,255,255,.05);} 
-.evt-head{display:grid;grid-template-columns:1fr 1fr;align-items:stretch;gap:.8rem;padding:.8rem .9rem;min-height:160px;}
-.evt-thumb{width:100%;height:100%;border-radius:12px;background:#0f1728 center/cover no-repeat;border:1px solid rgba(255,255,255,.08);} 
-.evt-head .evt-text{display:flex;flex-direction:column;justify-content:center;gap:.3rem;min-width:0;padding:.2rem .2rem;}
-.evt-title{font-weight:900;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:1.02rem;}
-.evt-tag-badge{align-self:flex-start;background:var(--accent-soft);color:#e6f1ff;border:1px solid var(--accent-soft-border);font-size:.64rem;font-weight:800;letter-spacing:.3px;padding:.12rem .42rem;border-radius:999px;}
-.evt-meta{font-size:.82rem;color:#cfe3f6;opacity:.96;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.evt-card:not([aria-expanded="true"]) .evt-meta{display:none;}
-.evt-expand{padding:.2rem .9rem .9rem;display:grid;grid-template-columns:1fr;gap:1rem;opacity:0;height:0;overflow:hidden;transition:height .38s ease, opacity .22s ease, margin-top .22s ease;pointer-events:none;will-change:height;}
-.evt-card[aria-expanded="true"] .evt-expand{opacity:1;pointer-events:auto;margin-top:.2rem;grid-template-columns:1.2fr 1fr;}
-.evt-expand .col-left{min-height:260px;}
-.evt-expand .col-right{display:flex;flex-direction:column;gap:.7rem;}
-.evt-hero-xl{width:100%;height:100%;border-radius:14px;background:#0f1728 center/cover no-repeat;border:1px solid rgba(255,255,255,.08);} 
-.evt-card[aria-expanded="true"] .evt-hero-xl{background-size:cover;} 
+.ev-split{flex:1;display:grid;grid-template-columns:minmax(320px, 36%) 1fr;gap:0;min-height:0;}
+.ev-col-list{min-width:0;border-right:1px solid rgba(255,255,255,.08);background:rgba(12,16,24,.28);} 
+.ev-col-detail{min-width:0;}
+.evt-list{height:100%;padding:.6rem .6rem .9rem;display:flex;flex-direction:column;gap:.4rem;overflow:auto;}
+.evt-item{display:grid;grid-template-columns:64px 1fr auto;align-items:center;gap:.65rem;padding:.6rem .6rem;border-radius:8px;border:1px solid rgba(255,255,255,.12);background:rgba(10,14,22,.26);cursor:pointer;transition:background .25s, border-color .25s, box-shadow .25s;}
+.evt-item:hover{background:rgba(255,255,255,.08);} 
+.evt-item[aria-selected="true"]{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.22);box-shadow:0 6px 20px -12px rgba(0,0,0,.6);}
+.evt-thumb-sm{width:64px;height:48px;border-radius:8px;background:#0f1728 center/cover no-repeat;border:1px solid rgba(255,255,255,.08);} 
+.evt-title-sm{font-weight:850;color:#fff;font-size:.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.evt-meta-sm{font-size:.65rem;color:#cfe3f6;opacity:.95;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.evt-date-chip{font-size:.62rem;font-weight:800;color:#0b1220;background:#f3e4d6;border:1px solid rgba(0,0,0,.1);border-radius:999px;padding:.16rem .5rem;}
+
+/* Detail side */
+.evt-detail{height:100%;padding:1.2rem 1.2rem 1.5rem;display:grid;grid-template-rows:auto 1fr auto;gap:.8rem;}
+.evt-hero{width:100%;aspect-ratio:16/9;border-radius:10px;background:#0f1728 center/contain no-repeat;border:1px solid rgba(255,255,255,.1);box-shadow:0 16px 44px -24px rgba(0,0,0,.7), inset 0 0 0 1px rgba(255,255,255,.04);} 
+.evt-headline{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;}
 .evt-title-xl{font-weight:900;font-size:1.25rem;color:#fff;}
-.evt-meta-line{font-size:.9rem;color:#cfe3f6;opacity:.95;}
-.evt-date-badge{align-self:flex-start;font-weight:900;font-size:1.1rem;color:#0b1220;background:#f3e4d6;border:1px solid rgba(0,0,0,.1);border-radius:12px;padding:.25rem .55rem;box-shadow:0 8px 22px -14px rgba(0,0,0,.5), inset 0 0 0 1px rgba(255,255,255,.12);} 
-.evt-desc{color:#cfe3e6;line-height:1.45;font-size:.9rem;}
-.evt-more{display:flex;gap:1rem;flex-wrap:wrap;font-size:.82rem;color:#d6e2f2;}
+.evt-tag{background:var(--accent-soft);color:#e6f1ff;border:1px solid var(--accent-soft-border);font-size:.64rem;font-weight:800;letter-spacing:.3px;padding:.12rem .42rem;border-radius:999px;}
+.evt-meta-line{display:flex;gap:.8rem;flex-wrap:wrap;color:#cfe3f6;font-size:.85rem;opacity:.96;}
+.evt-desc{color:#cfe3e6;line-height:1.5;font-size:.92rem;}
+.evt-actions{display:flex;gap:.6rem;justify-content:flex-end;}
+.evt-btn{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#fff;border-radius:6px;padding:.5rem .8rem;cursor:pointer;font-weight:700;}
+.evt-btn.primary{background:linear-gradient(180deg,#3b82f6,#1d4ed8);border-color:rgba(59,130,246,.55);} 
 .event-cta:hover{filter:brightness(1.03);} 
 
 /* Right-side tool rail (floating circular controls) */
@@ -433,26 +432,7 @@ body.transitioning *{
 </style>
 </head>
 <body>
-<div id="bootLoader" aria-live="polite" style="position:fixed;inset:0;z-index:1000;background:#000;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:18px;">
-  <div class="boot-spinner" style="width:48px;height:48px;border-radius:50%;border:4px solid rgba(255,255,255,.16);border-top-color:#fff;animation:bootspin 1s linear infinite"></div>
-  <div class="boot-text" style="color:#e9edf4;font-weight:800;letter-spacing:.4px;font-size:.9rem;opacity:.95;">
-    Loading media… <span id="bootPct">0%</span>
-  </div>
-</div>
-<style>
-@keyframes bootsin {from{transform:rotate(0)}to{transform:rotate(360deg)}}
-@keyframes bootsin2 {from{transform:rotate(0)}to{transform:rotate(360deg)}}
-@keyframes bootsin3 {from{transform:rotate(0)}to{transform:rotate(360deg)}}
-@keyframes bootsin4 {from{transform:rotate(0)}to{transform:rotate(360deg)}}
-@keyframes bootsin5 {from{transform:rotate(0)}to{transform:rotate(360deg)}}
-@keyframes bootsin6 {from{transform:rotate(0)}to{transform:rotate(360deg)}}
-@keyframes bootsin7 {from{transform:rotate(0)}to{transform:rotate(360deg)}}
-@keyframes bootsin8 {from{transform:rotate(0)}to{transform:rotate(360deg)}}
-@keyframes bootsin9 {from{transform:rotate(0)}to{transform:rotate(360deg)}}
-@keyframes bootsin10 {from{transform:rotate(0)}to{transform:rotate(360deg)}}
-@keyframes bootsin11 {from{transform:rotate(0)}to{transform:rotate(360deg)}}
-@keyframes bootspin {from{transform:rotate(0)}to{transform:rotate(360deg)}}
-</style>
+<!-- Boot overlay removed: enter experience immediately; media preloads in background. -->
 <header>Convention Center Navigator <span class="badge">Beta</span></header>
 <div id="stage">
   <div id="stage-backdrop"></div>
@@ -501,27 +481,10 @@ body.transitioning *{
   <button class="dock-cta-bar" id="dockCta" type="button">GET MORE INFORMATION</button>
     </div>
     <div class="dock-floor" id="dockFloor">
-      <div class="floor-panel">
-        <div class="floor-config-label">FLOOR PLAN CONFIGURATOR</div>
-        <div class="floor-upper">
-          <div class="floor-preview-wrap">
-            <div class="floor-center">
-              <div class="floor-preview" id="floorPreview"><div class="hint">Preview</div></div>
-            </div>
-          </div>
-          <div class="floor-info">
-            <div class="floor-head">
-              <div class="floor-title" id="floorTitle">Loading layout…</div>
-              <div class="floor-price" id="floorPrice">$0/day</div>
-            </div>
-            <div class="floor-desc" id="floorDesc">Choose a layout preset for this room. Pricing shown is per day and illustrative.</div>
-          </div>
-        </div>
-        <div class="floor-bottom-bar">
-          <button class="floor-btn" id="prevLayout" type="button">‹ Prev</button>
-          <button class="floor-exit" id="exitFloor" type="button">Exit Floor Plan View</button>
-          <button class="floor-btn" id="nextLayout" type="button">Next ›</button>
-        </div>
+      <div class="floor-panel" style="display:flex;align-items:center;justify-content:center;height:100%;">
+        <a href="calculator.html" id="openCalculator" class="floor-exit" style="text-decoration:none;display:inline-flex;align-items:center;justify-content:center;padding:.8rem 1.2rem;font-size:.8rem;border-radius:12px;">
+          Open Event Calculator
+        </a>
       </div>
     </div>
   </div>
@@ -568,7 +531,14 @@ body.transitioning *{
       </div>
     </div>
     <div class="ev-wrap">
-      <div class="evt-list" id="evtList" aria-label="Events" tabindex="0"></div>
+      <div class="ev-split">
+        <div class="ev-col-list">
+          <div class="evt-list" id="evtList" role="listbox" aria-label="Events" tabindex="0"></div>
+        </div>
+        <div class="ev-col-detail">
+          <div id="evtDetail" class="evt-detail" aria-live="polite"></div>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -822,14 +792,15 @@ init();
 
 async function init(){
   disableUI(true);
-  // Aggressive boot-time preload with on-screen black overlay and progress
-  try{ await bootPreloadAllMedia({ timeoutMs: 45000 }); }catch(e){ console.warn('[CC][BOOT] preload failed', e); }
+  // Start playing immediately
   await loadLoop(states[current].loop);
   try { await active.play(); } catch(e) {}
   setState(current);
   disableUI(false);
   status('Ready');
   updateMobileContain();
+  // Background preload (no UI)
+  bootPreloadAllMedia({ timeoutMs: 45000 }).catch(e=>console.warn('[CC][BOOT] background preload failed', e));
 }
 
 // Guarantee first painted frame before reveal
@@ -1367,6 +1338,7 @@ function preloadNextTransitions(){
 async function bootPreloadAllMedia({ timeoutMs = 60000 } = {}){
   const overlay = document.getElementById('bootLoader');
   const pctEl = document.getElementById('bootPct');
+  const barEl = document.getElementById('bootBarFill');
   try{
     // Collect loops and transitions
     const loops = new Set(Object.values(states).map(s=>s.loop).filter(Boolean));
@@ -1376,7 +1348,7 @@ async function bootPreloadAllMedia({ timeoutMs = 60000 } = {}){
     const resolvedLoops = await Promise.all(Array.from(loops).map(l=>resolveLoopFilename(l)));
     const files = [...new Set([...resolvedLoops, ...Array.from(transitions)])];
     let done = 0;
-    const update = ()=>{ if(pctEl){ pctEl.textContent = Math.max(0, Math.min(100, Math.round((done/files.length)*100))) + '%'; } };
+    const update = ()=>{ /* no visible progress UI */ };
     update();
     // Fetch sequentially to avoid I/O spikes on Pi
     for(const f of files){
@@ -1395,9 +1367,7 @@ async function bootPreloadAllMedia({ timeoutMs = 60000 } = {}){
       }catch(e){ console.warn('[CC][BOOT] preload failed', f, e); }
       done++; update();
     }
-  } finally {
-    if(overlay) overlay.style.display='none';
-  }
+  } finally { /* nothing to show/hide */ }
 }
 
 function warmVideo(src){
@@ -1751,8 +1721,7 @@ function updateFloorUIVisibility(){
   if(info){ info.style.display = 'none'; }
   // Initialize floor dots/rendering when entering floor modes
   if(isFloor){
-    if(floorDots && !floorDots.children.length) buildDots();
-    renderFloor();
+    // Floor configurator disabled for now
     document.body.classList.add('floor-config-active');
   } else {
     document.body.classList.remove('floor-config-active');
@@ -1983,148 +1952,125 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   try{ if(EVENTS.length) renderEvent(0); }catch{}
   setTimeout(syncEventSlideshow, 100); 
   // Attach floor plan control handlers explicitly (in case delegation misses due to layering)
-  const prevBtn = document.getElementById('prevLayout');
-  const nextBtn = document.getElementById('nextLayout');
-  const exitBtn = document.getElementById('exitFloor');
-  if(prevBtn) prevBtn.addEventListener('click', ()=> setFloorIdx(floorIdx-1));
-  if(nextBtn) nextBtn.addEventListener('click', ()=> setFloorIdx(floorIdx+1));
-  if(exitBtn) exitBtn.addEventListener('click', ()=> {
-    if(current==='convention_floor') go('convention');
-    else if(current==='expo_floor') go('expo');
-  });
+  // Floor configurator controls removed; only calculator link and exit via left nav remain
   // Wire events modal open
   const cta = document.getElementById('eventCta');
-  if(cta){ cta.addEventListener('click', ()=> openEventsModal()); }
+  if(cta){ cta.addEventListener('click', ()=> openEventsModal(eventIdx)); }
 });
 // --------- Events Modal Logic ---------
-async function openEventsModal(){
+async function openEventsModal(preselectIdx){
   const m = document.getElementById('eventsModal'); if(!m) return;
   m.classList.add('show'); m.setAttribute('aria-hidden','false');
+  // Pause rotating popup while browsing list
+  stopEventSlideshow();
   if(!EVENTS || EVENTS.length===0){
     try{ await loadEvents(); }catch{}
   }
-  renderEventsRail();
+  renderEventsList(typeof preselectIdx==='number' ? preselectIdx : 0);
+  // Move focus into the list for keyboard nav
+  m.querySelector('#evtList')?.focus();
 }
 function closeEventsModal(){
   const m = document.getElementById('eventsModal'); if(!m) return;
   m.classList.remove('show'); m.setAttribute('aria-hidden','true');
+  // Resume slideshow if appropriate
+  setTimeout(syncEventSlideshow, 50);
 }
 document.addEventListener('click', (e)=>{
   if(e.target && e.target.hasAttribute && e.target.hasAttribute('data-ev-close')) closeEventsModal();
 });
 document.addEventListener('keydown', (e)=>{ if(e.key==='Escape') closeEventsModal(); });
 document.getElementById('evClose')?.addEventListener('click', closeEventsModal);
-document.getElementById('dockCta')?.addEventListener('click', openEventsModal);
+document.getElementById('dockCta')?.addEventListener('click', ()=> openEventsModal(eventIdx));
 
-function renderEventsRail(){
+let EV_SELECTED_IDX = 0;
+function renderEventsList(preselectIdx=0){
   const list = document.getElementById('evtList');
-  if(!list) return;
+  const detail = document.getElementById('evtDetail');
+  if(!list || !detail) return;
   list.innerHTML='';
-  let expandedId = null;
+  detail.innerHTML='';
+  if(!EVENTS.length){
+    detail.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;opacity:.8;">No events available</div>`;
+    return;
+  }
+  EV_SELECTED_IDX = Math.max(0, Math.min(EVENTS.length-1, preselectIdx|0));
   EVENTS.forEach((e, idx)=>{
-    const card = document.createElement('div');
-    card.className='evt-card';
-    card.setAttribute('role','button');
-    card.setAttribute('tabindex','0');
-    card.setAttribute('aria-expanded','false');
+    const item = document.createElement('div');
+    item.className='evt-item';
+    item.setAttribute('role','option');
+    item.setAttribute('tabindex', idx===EV_SELECTED_IDX ? '0' : '-1');
+    item.setAttribute('aria-selected', idx===EV_SELECTED_IDX ? 'true' : 'false');
+    item.dataset.index = String(idx);
     const hero = e.hero ? `style="background-image:url('${e.hero}')"` : '';
-    const desc = e.desc ? e.desc : '';
     const meta = `${e.tag||''}${e.hours? ' • '+e.hours:''}${e.spot? ' • '+e.spot:''}`;
-    card.innerHTML = `
-      <div class="evt-head">
-        <div class="evt-thumb" ${hero}></div>
-        <div class="evt-text">
-          ${e.tag? `<div class="evt-tag-badge">${e.tag}</div>`:''}
-          <div class="evt-title">${e.title||'Untitled Event'}</div>
-          <div class="evt-meta">${meta}</div>
-        </div>
+    item.innerHTML = `
+      <div class="evt-thumb-sm" ${hero}></div>
+      <div style="min-width:0;display:flex;flex-direction:column;gap:2px;">
+        <div class="evt-title-sm">${e.title||'Untitled Event'}</div>
+        <div class="evt-meta-sm">${meta}</div>
       </div>
-      <div class="evt-expand">
-        <div class="col-left">
-          <div class="evt-hero-xl" ${hero}></div>
-        </div>
-        <div class="col-right">
-          <div class="evt-title-xl">${e.title||'Untitled Event'}</div>
-          ${e.hours? `<div class="evt-date-badge">${e.hours}</div>`:''}
-          <div class="evt-meta-line">${e.tag||''}${e.spot? ' • '+e.spot:''}${e.distance? ' • '+e.distance:''}</div>
-          ${desc? `<div class="evt-desc">${desc}</div>`:''}
-          <div class="evt-more">
-            ${e.spot? `<div><strong>Location:</strong> ${e.spot}</div>`:''}
-            ${e.distance? `<div><strong>Distance:</strong> ${e.distance}</div>`:''}
-          </div>
-        </div>
-      </div>
+      ${e.hours? `<div class="evt-date-chip">${e.hours}</div>`:''}
     `;
-    function animateHeight(el, toHeight){
-      // Uses explicit height transitions so siblings are pushed by layout
-      const from = el.getBoundingClientRect().height;
-      el.style.height = from + 'px';
-      // Force reflow
-      el.offsetHeight;
-      el.style.height = toHeight + 'px';
-      const done = ()=>{
-        el.style.height = '';
-        el.removeEventListener('transitionend', done);
-      };
-      el.addEventListener('transitionend', done);
-    }
-    function measureExpandedHeight(){
-      const was = card.getAttribute('aria-expanded');
-      const head = card.querySelector('.evt-head');
-      const exp = card.querySelector('.evt-expand');
-      const prevH = card.getBoundingClientRect().height;
-      // Temporarily mark expanded to allow CSS grid columns in expanded state
-      card.setAttribute('aria-expanded','true');
-      // Let inner expand content size naturally to measure
-      exp.style.height = 'auto';
-      const expScroll = exp.scrollHeight;
-      const headH = head.getBoundingClientRect().height;
-      // Target is head + expanded content height
-      const target = headH + expScroll + 14; // small buffer
-      // Revert styles
-      card.setAttribute('aria-expanded', was||'false');
-      exp.style.height = '';
-      return {prevH, target, expScroll, headH};
-    }
-    function collapseOpen(){
-      const open = list.querySelector('.evt-card[aria-expanded="true"]');
-      if(open && open!==card){
-        const exp = open.querySelector('.evt-expand');
-        const from = open.getBoundingClientRect().height;
-        open.setAttribute('aria-expanded','false');
-        exp.style.height = '0px';
-        animateHeight(open, open.querySelector('.evt-head').getBoundingClientRect().height);
-      }
-    }
-    function expand(){
-      const isOpen = card.getAttribute('aria-expanded')==='true';
-      if(isOpen){
-        // collapse this card
-        const headH = card.querySelector('.evt-head').getBoundingClientRect().height;
-        const exp = card.querySelector('.evt-expand');
-        card.setAttribute('aria-expanded','false');
-        exp.style.height = '0px';
-        animateHeight(card, headH);
-        return;
-      }
-      collapseOpen();
-      // expanding current card
-  const m = measureExpandedHeight();
-  const exp = card.querySelector('.evt-expand');
-  card.setAttribute('aria-expanded','true');
-  exp.style.height = m.expScroll + 'px';
-  animateHeight(card, m.target);
-      card.scrollIntoView({ behavior:'smooth', block:'nearest' });
-    }
-    card.addEventListener('click', expand);
-    card.addEventListener('keydown', (ev)=>{
-      if(ev.key==='Enter' || ev.key===' '){ ev.preventDefault(); expand(); }
-      // simple up/down keyboard navigation
-      if(ev.key==='ArrowDown'){ ev.preventDefault(); card.nextElementSibling?.focus(); }
-      if(ev.key==='ArrowUp'){ ev.preventDefault(); card.previousElementSibling?.focus(); }
+    item.addEventListener('click', ()=> selectEvent(idx, { focus:true }));
+    item.addEventListener('keydown', (ev)=>{
+      const max = EVENTS.length-1;
+      if(ev.key==='ArrowDown'){ ev.preventDefault(); selectEvent(Math.min(max, (EV_SELECTED_IDX+1)), { focus:true }); }
+      else if(ev.key==='ArrowUp'){ ev.preventDefault(); selectEvent(Math.max(0, (EV_SELECTED_IDX-1)), { focus:true }); }
+      else if(ev.key==='Home'){ ev.preventDefault(); selectEvent(0, { focus:true }); }
+      else if(ev.key==='End'){ ev.preventDefault(); selectEvent(max, { focus:true }); }
+      else if(ev.key==='Enter' || ev.key===' '){ ev.preventDefault(); selectEvent(EV_SELECTED_IDX, { focus:true }); }
     });
-    list.appendChild(card);
+    list.appendChild(item);
   });
+  // Initial selection
+  selectEvent(EV_SELECTED_IDX, { focus:false, reveal:true });
+  // Focus management: move focus to selected item when list gets focus
+  list.addEventListener('focus', ()=>{
+    const el = list.querySelector('.evt-item[aria-selected="true"]');
+    if(el) el.focus();
+  });
+}
+
+function selectEvent(idx, { focus=false, reveal=false }={}){
+  const list = document.getElementById('evtList');
+  const detail = document.getElementById('evtDetail');
+  if(!list || !detail || !EVENTS.length) return;
+  idx = Math.max(0, Math.min(EVENTS.length-1, idx|0));
+  EV_SELECTED_IDX = idx;
+  const items = Array.from(list.querySelectorAll('.evt-item'));
+  items.forEach((it,i)=>{
+    const sel = i===idx;
+    it.setAttribute('aria-selected', sel?'true':'false');
+    it.tabIndex = sel? 0 : -1;
+    if(sel && focus){ it.focus(); }
+  });
+  const selectedEl = items[idx];
+  if(reveal && selectedEl){ selectedEl.scrollIntoView({ behavior:'smooth', block:'nearest' }); }
+  renderEventDetail(EVENTS[idx]);
+}
+
+function renderEventDetail(e){
+  const detail = document.getElementById('evtDetail');
+  if(!detail){ return; }
+  const hero = e.hero ? `style="background-image:url('${e.hero}')"` : '';
+  const metaBits = [e.hours, e.spot, e.distance].filter(Boolean).join(' • ');
+  detail.innerHTML = `
+    <div class="evt-hero" ${hero}></div>
+    <div>
+      <div class="evt-headline">
+        <div class="evt-title-xl">${e.title||'Untitled Event'}</div>
+        ${e.tag? `<div class="evt-tag">${e.tag}</div>`:''}
+      </div>
+      ${metaBits? `<div class="evt-meta-line">${metaBits}</div>`:''}
+      ${e.desc? `<div class="evt-desc">${e.desc}</div>`:''}
+    </div>
+    <div class="evt-actions">
+      <button type="button" class="evt-btn" id="evtCloseBtn">Close</button>
+      <button type="button" class="evt-btn primary">Plan Your Visit</button>
+    </div>
+  `;
+  document.getElementById('evtCloseBtn')?.addEventListener('click', closeEventsModal);
 }
 
 // Variant engine scaffold (will expand for additional radical redesigns)

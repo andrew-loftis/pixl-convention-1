@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Event Calculator</title>
+<style>
+  :root{
+    --bg:#0b1118; --fg:#e9edf4; --muted:#bcd0e6;
+    --border:rgba(255,255,255,.12); --panel:rgba(12,16,24,.42);
+    --accent:#3b82f6; --accent-alt:#1d4ed8;
+    --radius:10px;
+  }
+  html,body{height:100%;}
+  body{margin:0;background:var(--bg);color:var(--fg);font-family:Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;}
+  header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px;border-bottom:1px solid var(--border);background:#0e1626;position:sticky;top:0;z-index:10}
+  header .title{font-weight:800;letter-spacing:.3px}
+  header .back{background:rgba(255,255,255,.08);border:1px solid var(--border);color:#fff;border-radius:8px;padding:.45rem .7rem;text-decoration:none}
+  .tabs{display:flex;gap:8px;padding:10px 16px;border-bottom:1px solid var(--border);background:#0e1626}
+  .tab{appearance:none;border:1px solid var(--border);background:rgba(255,255,255,.06);color:#dbe7ff;border-radius:999px;padding:.45rem .8rem;font-weight:800;letter-spacing:.2px;cursor:pointer}
+  .tab.active{background:linear-gradient(180deg,var(--accent),var(--accent-alt));border-color:rgba(59,130,246,.55);color:#0b1220}
+  .wrap{max-width:1200px;margin:0 auto;padding:20px;display:grid;grid-template-columns: 1.1fr .9fr;gap:20px;}
+  @media (max-width: 1000px){ .wrap{grid-template-columns: 1fr;}}
+  .panel{border:1px solid var(--border);border-radius:14px;background:var(--panel);backdrop-filter:blur(14px) saturate(170%);-webkit-backdrop-filter:blur(14px) saturate(170%);box-shadow:0 16px 42px -18px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.04) inset;}
+  .form{padding:18px;display:grid;grid-template-columns: 1fr;gap:16px;}
+  .form h2{grid-column:1/-1;margin:.4rem 0 .6rem;font-size:1.12rem;letter-spacing:.2px}
+  .section{grid-column:1/-1;border:1px solid var(--border);border-radius:12px;padding:14px 14px 10px;background:rgba(255,255,255,.02)}
+  details.section{padding:0}
+  details.section > summary{list-style:none;cursor:pointer;padding:14px 14px;border-radius:12px;color:var(--fg);font-weight:800}
+  details.section[open] > summary{border-bottom:1px solid var(--border);border-bottom-left-radius:0;border-bottom-right-radius:0}
+  details.section > .content{padding:14px}
+  .section h2{margin:.1rem 0 .6rem;font-size:1rem;opacity:.9}
+  .field{display:flex;flex-direction:column;gap:6px}
+  .field label{font-size:.82rem;color:var(--muted)}
+  .field input[type="number"], .field select, .field input[type="text"]{background:#0f1728;color:#fff;border:1px solid var(--border);border-radius:10px;padding:.6rem .7rem}
+  .row{grid-column:1/-1;display:grid;grid-template-columns: repeat(4, 1fr);gap:12px}
+  .row-3{grid-template-columns: repeat(3, 1fr)}
+  .row-2{grid-template-columns: repeat(2, 1fr)}
+  .row-1{grid-template-columns: 1fr}
+  .inline{display:flex;align-items:center;gap:8px}
+  .check{display:flex;gap:12px;align-items:center}
+  .check input{width:18px;height:18px}
+  .summary{padding:18px;display:flex;flex-direction:column;gap:14px}
+  .total-card{border:1px solid var(--border);border-radius:12px;padding:16px;background:rgba(255,255,255,.03)}
+  .total{font-size:2rem;font-weight:900}
+  .btns{display:flex;gap:8px;flex-wrap:wrap}
+  .btn{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#fff;border-radius:8px;padding:.55rem .8rem;cursor:pointer;text-decoration:none}
+  .btn.primary{background:linear-gradient(180deg,var(--accent),var(--accent-alt));border-color:rgba(59,130,246,.55)}
+  ul.lines{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;max-height:420px;overflow:auto}
+  ul.lines li{display:flex;justify-content:space-between;gap:10px;border-bottom:1px dashed rgba(255,255,255,.08);padding-bottom:6px}
+  .muted{color:var(--muted)}
+  .hint{font-size:.75rem;color:#a9bad2}
+  .coming-soon{padding:28px;text-align:center}
+  .coming-soon h3{margin:.2rem 0 .4rem;font-size:1.2rem}
+  .coming-soon p{color:var(--muted)}
+  [hidden]{display:none !important}
+</style>
+</head>
+<body>
+  <header>
+    <div class="title" id="pageTitle">Event Cost Calculator</div>
+    <a href="index.html" class="back">← Back to Navigator</a>
+  </header>
+  <div class="tabs" id="facilityTabs" role="tablist" aria-label="Facility selection">
+    <button class="tab active" role="tab" aria-selected="true" data-facility="convention">Convention Center</button>
+    <button class="tab" role="tab" aria-selected="false" data-facility="expo">Expo Center</button>
+    <button class="tab" role="tab" aria-selected="false" data-facility="pavilion">Pavilion</button>
+    <button class="tab" role="tab" aria-selected="false" data-facility="midway">Midway</button>
+  </div>
+  <div class="wrap">
+    <div class="panel" id="leftPanel">
+      <form class="form" id="calcForm" onsubmit="return false;">
+        <div class="section">
+          <h2>Venue & Schedule</h2>
+          <div class="row row-3">
+            <div class="field">
+              <label for="venue">Venue</label>
+              <select id="venue">
+                <option value="grandBallroom">Grand Ballroom</option>
+                <option value="partitionedBallroom">Partitioned Ballroom</option>
+                <option value="fairgrounds">Fairgrounds / Parking Lot</option>
+                <option value="concertArea">Fairgrounds Concert Area</option>
+              </select>
+            </div>
+            <div class="field" id="sectionsWrap">
+              <label for="sections">Sections (Partitioned Ballroom)</label>
+              <input type="number" id="sections" min="1" max="3" value="1" />
+            </div>
+            <div class="field">
+              <label for="dayBand">Rate Day</label>
+              <select id="dayBand">
+                <option value="monThu" selected>Mon–Thu</option>
+                <option value="friSun">Fri–Sun</option>
+              </select>
+            </div>
+          </div>
+          <div class="row row-3">
+            <div class="field">
+              <label for="hours">Hours (per day)</label>
+              <input type="number" id="hours" min="1" max="24" step="1" value="8" />
+            </div>
+            <div class="field">
+              <label for="days">Number of Days</label>
+              <input type="number" id="days" min="1" value="1" />
+            </div>
+            <div class="field">
+              <label for="discountType">Special Rate</label>
+              <select id="discountType">
+                <option value="none" selected>None</option>
+                <option value="countyAgency">County/City Agency</option>
+                <option value="countyMeeting">County Meeting</option>
+              </select>
+            </div>
+          </div>
+          <div class="row row-3">
+            <div class="field">
+              <label><input type="checkbox" id="afterHoursFlag" /> Any hours outside Mon–Sat 9am–5pm?</label>
+            </div>
+            <div class="field">
+              <label for="afterHoursHours">After-hours hours</label>
+              <input type="number" id="afterHoursHours" min="0" value="0" />
+            </div>
+            <div class="field">
+              <label for="afterHoursRate">After-hours surcharge per hour ($)</label>
+              <input type="number" id="afterHoursRate" min="0" step="10" value="0" />
+            </div>
+          </div>
+        </div>
+
+        <details class="section">
+          <summary>Décor / Seating (optional)</summary>
+          <div class="content">
+            <div class="row row-3">
+              <div class="field">
+                <label for="tablesQty">Tables (qty)</label>
+                <input type="number" id="tablesQty" min="0" value="0" />
+                <label for="tablesSetup">Setup</label>
+                <select id="tablesSetup"><option value="staff" selected>Staff setup</option><option value="diy">DIY</option></select>
+              </div>
+              <div class="field">
+                <label for="clothQty">Tablecloths (qty)</label>
+                <input type="number" id="clothQty" min="0" value="0" />
+                <label for="clothSetup">Setup</label>
+                <select id="clothSetup"><option value="staff" selected>Staff setup</option><option value="diy">DIY</option></select>
+              </div>
+              <div class="field">
+                <label for="topperQty">Table Toppers (qty)</label>
+                <input type="number" id="topperQty" min="0" value="0" />
+                <label for="topperSetup">Setup</label>
+                <select id="topperSetup"><option value="staff" selected>Staff setup</option><option value="diy">DIY</option></select>
+              </div>
+            </div>
+            <div class="row row-3">
+              <div class="field">
+                <label for="candleQty">Candle Vase w/ candles (qty)</label>
+                <input type="number" id="candleQty" min="0" value="0" />
+                <label for="candleSetup">Setup</label>
+                <select id="candleSetup"><option value="staff" selected>Staff setup</option><option value="diy">DIY</option></select>
+              </div>
+              <div class="field">
+                <label for="mirrorQty">Table Mirrors (qty)</label>
+                <input type="number" id="mirrorQty" min="0" value="0" />
+                <label for="mirrorSetup">Setup</label>
+                <select id="mirrorSetup"><option value="staff" selected>Staff setup</option><option value="diy">DIY</option></select>
+              </div>
+              <div class="field">
+                <label for="chairsQty">Banquet Chairs (qty)</label>
+                <input type="number" id="chairsQty" min="0" value="0" />
+                <label for="chairsSetup">Setup</label>
+                <select id="chairsSetup"><option value="staff" selected>Staff setup</option><option value="diy">DIY</option></select>
+              </div>
+            </div>
+            <div class="row row-3">
+              <div class="field">
+                <label for="buffetQty">Buffet Tables (qty)</label>
+                <input type="number" id="buffetQty" min="0" value="0" />
+              </div>
+              <div class="field">
+                <label>Pipe & Drape</label>
+                <input type="text" value="Unavailable (see vendor)" disabled />
+              </div>
+            </div>
+          </div>
+        </details>
+
+        <details class="section">
+          <summary>Other Amenities (optional)</summary>
+          <div class="content">
+            <div class="row row-3">
+              <div class="field"><label><input type="checkbox" id="stageIncluded" /> Stage with Podium & Microphone (Free)</label></div>
+              <div class="field">
+                <label for="addMicQty">Wireless Mic & Stand (qty)</label>
+                <input type="number" id="addMicQty" min="0" value="0" />
+              </div>
+              <div class="field">
+                <label for="podiumDisplayQty">Podium Digital Graphic Display (qty)</label>
+                <input type="number" id="podiumDisplayQty" min="0" value="0" />
+              </div>
+            </div>
+            <div class="row row-3">
+              <div class="field"><label><input type="checkbox" id="promoIncluded" /> Event Promotion on Social (Free)</label></div>
+              <div class="field"><label><input type="checkbox" id="trashIncluded" /> Oversized Trash Cans/Bags (Free)</label></div>
+            </div>
+          </div>
+        </details>
+
+        <details class="section">
+          <summary>Staffing & Tax (optional)</summary>
+          <div class="content">
+            <div class="row row-3">
+              <div class="field">
+                <label for="addStaffQty">Additional Staff (qty)</label>
+                <input type="number" id="addStaffQty" min="0" value="0" />
+              </div>
+              <div class="field">
+                <label for="addStaffRate">Additional Staff Rate ($/hr)</label>
+                <input type="number" id="addStaffRate" min="0" step="5" value="0" />
+              </div>
+              <div class="field">
+                <label for="taxable">Tax</label>
+                <select id="taxable"><option value="yes">Apply Tax</option><option value="no">No Tax</option></select>
+              </div>
+            </div>
+          </div>
+        </details>
+      </form>
+      <div class="coming-soon" id="comingSoon" hidden>
+        <h3>Pricing coming soon</h3>
+        <p>Pricing for space rental at the selected facility is coming soon. Please check back later.</p>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="summary">
+        <div class="total-card">
+          <div class="muted">Estimated Total (per day)</div>
+          <div class="total" id="grandTotal">$0</div>
+          <div class="muted" id="notes">All prices are sample placeholders — configurable.</div>
+        </div>
+        <ul class="lines" id="lineItems"></ul>
+        <div class="btns">
+          <a href="index.html" class="btn">← Back to Navigator</a>
+          <button class="btn primary" id="printBtn" type="button">Print Estimate</button>
+          <button class="btn" id="resetBtn" type="button">Reset</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+    // Facility tabs state
+    let currentFacility = 'convention'; // convention | expo | pavilion | midway
+    function setFacility(fac){
+      currentFacility = fac;
+      // Tabs active state
+      document.querySelectorAll('.tab').forEach(t=>{
+        const is = t.getAttribute('data-facility')===fac; t.classList.toggle('active', is); t.setAttribute('aria-selected', String(is));
+      });
+      // Toggle calculator vs coming soon guard
+      const form = document.getElementById('calcForm');
+      const guard = document.getElementById('comingSoon');
+      const title = document.getElementById('pageTitle');
+      const labelMap = { convention:'Convention Center', expo:'Expo Center', pavilion:'Pavilion', midway:'Midway' };
+      if(title) title.textContent = `Event Cost Calculator · ${labelMap[fac]||''}`;
+      const enabled = (fac==='convention');
+      if(form){
+        form.hidden = !enabled;
+        // hard-disable all inputs when hidden to avoid accidental focus/scroll
+        form.querySelectorAll('input,select,button,textarea').forEach(el=>{ el.disabled = !enabled; });
+      }
+      if(guard){ guard.hidden = enabled; }
+      compute();
+    }
+    function wireFacilityTabs(){
+      document.querySelectorAll('#facilityTabs .tab').forEach(btn=>{
+        btn.addEventListener('click', (e)=>{
+          e.preventDefault();
+          const fac = btn.getAttribute('data-facility') || 'convention';
+          setFacility(fac);
+        });
+      });
+    }
+
+    // Provided rate sheet (USD). Hourly vs daily: choose cheaper for selected hours.
+    const R = {
+      venues: {
+        grandBallroom: {
+          monThu: { hr: 149, day: 1000 },
+          friSun: { hr: 189, day: 1200 }
+        },
+        partitionedBallroom: {
+          monThu: { hrPerSection: 56, dayPerSection: 350 },
+          friSun: { hrPerSection: 75, dayPerSection: 420 }
+        },
+        fairgrounds: {
+          monThu: { hr: 100, day: 1000 },
+          friSun: { hr: 150, day: 1500 }
+        },
+        concertArea: {
+          monThu: { day: 1000 },
+          friSun: { day: 1200 }
+        }
+      },
+      decor: {
+        table: { staff: 15, diy: 7.5 },
+        tablecloth: { staff: 20, diy: 10 },
+        topper: { staff: 6, diy: 3 },
+        candle: { staff: 10, diy: 5 },
+        mirror: { staff: 5, diy: 2.5 },
+        chair: { staff: 2, diy: 1.6 }, // DIY is 20% off
+        buffet: 40
+      },
+      amenities: {
+        extraMic: 15,
+        podiumDisplay: 15
+      },
+      taxRate: 0.0925
+    };
+
+    const $ = sel => document.querySelector(sel);
+    const inputs = [
+      '#venue','#sections','#dayBand','#hours','#days','#discountType',
+      '#afterHoursFlag','#afterHoursHours','#afterHoursRate',
+      '#tablesQty','#tablesSetup','#clothQty','#clothSetup','#topperQty','#topperSetup',
+      '#candleQty','#candleSetup','#mirrorQty','#mirrorSetup','#chairsQty','#chairsSetup',
+      '#buffetQty','#stageIncluded','#addMicQty','#podiumDisplayQty','#promoIncluded','#trashIncluded',
+      '#addStaffQty','#addStaffRate','#taxable'
+    ].map($);
+
+    function currency(n){ return '$' + (Math.round(n*100)/100).toLocaleString(undefined,{minimumFractionDigits:0}); }
+
+    // Toggle sections field only for partitioned ballroom
+    function syncSections(){
+      const v=$('#venue').value; const w=$('#sectionsWrap'); if(!w) return;
+      w.style.display = (v==='partitionedBallroom') ? '' : 'none';
+    }
+
+    function compute(){
+      // Facility guard: only Convention Center has pricing today
+      if(currentFacility !== 'convention'){
+        const ul=$('#lineItems'); ul.innerHTML='';
+        const el=document.createElement('li');
+        const labelMap = { convention:'Convention Center', expo:'Expo Center', pavilion:'Pavilion', midway:'Midway' };
+        el.innerHTML = `<span>Pricing for ${labelMap[currentFacility]||'this facility'} coming soon</span><span>$0</span>`;
+        ul.appendChild(el);
+        $('#grandTotal').textContent = '$0';
+        $('#notes').textContent = 'Pricing for space rental at this facility is coming soon.';
+        return;
+      }
+      syncSections();
+      const venue=$('#venue').value;
+      const sections=Math.max(1, Math.min(3, +($('#sections').value||1)));
+      const band=$('#dayBand').value; // monThu | friSun
+      const hours=+$('#hours').value||0;
+      const days=+$('#days').value||1;
+      const discount=$('#discountType').value; // none | countyAgency | countyMeeting
+
+      const afterFlag=$('#afterHoursFlag').checked;
+      const afterH=+$('#afterHoursHours').value||0;
+      const afterRate=+$('#afterHoursRate').value||0;
+
+      // Décor
+      const tablesQty=+$('#tablesQty').value||0; const tablesSetup=$('#tablesSetup').value;
+      const clothQty=+$('#clothQty').value||0; const clothSetup=$('#clothSetup').value;
+      const topperQty=+$('#topperQty').value||0; const topperSetup=$('#topperSetup').value;
+      const candleQty=+$('#candleQty').value||0; const candleSetup=$('#candleSetup').value;
+      const mirrorQty=+$('#mirrorQty').value||0; const mirrorSetup=$('#mirrorSetup').value;
+      const chairsQty=+$('#chairsQty').value||0; const chairsSetup=$('#chairsSetup').value;
+      const buffetQty=+$('#buffetQty').value||0;
+
+      // Amenities
+      const stageInc=$('#stageIncluded').checked; // free
+      const addMicQty=+$('#addMicQty').value||0;
+      const podiumDisplayQty=+$('#podiumDisplayQty').value||0;
+      const promoInc=$('#promoIncluded').checked; const trashInc=$('#trashIncluded').checked; // free
+
+      // Staffing
+      const addStaffQty=+$('#addStaffQty').value||0;
+      const addStaffRate=+$('#addStaffRate').value||0;
+
+      const taxable=$('#taxable').value==='yes';
+
+      const lines=[]; let subtotal=0;
+
+      // Base venue: choose cheaper of (hours * hrRate) vs (day rate) when both exist.
+      function addLine(label, amt){ lines.push({label, amt}); subtotal += amt; }
+      const V = R.venues[venue];
+      if(!V || !V[band]){
+        addLine('Venue (unavailable tier)', 0);
+      } else {
+        const tier = V[band];
+        let venueCost = 0; let label = '';
+        if(venue==='partitionedBallroom'){
+          const hrRate = (tier.hrPerSection||0)*sections;
+          const dayRate = (tier.dayPerSection||0)*sections;
+          const hourly = hrRate>0 ? hrRate*hours : Infinity;
+          venueCost = Math.min(dayRate||Infinity, hourly||Infinity);
+          label = `Partitioned Ballroom x ${sections} (best of hourly/day)`;
+        } else if(venue==='concertArea'){
+          venueCost = tier.day||0;
+          label = 'Fairgrounds Concert Area (per day)';
+        } else {
+          const hrRate = tier.hr||0; const dayRate = tier.day||0;
+          const hourly = hrRate>0 ? hrRate*hours : Infinity;
+          venueCost = Math.min(dayRate||Infinity, hourly||Infinity);
+          label = (venue==='grandBallroom') ? 'Grand Ballroom (best of hourly/day)' : 'Fairgrounds / Parking (best of hourly/day)';
+        }
+        addLine(label, venueCost);
+      }
+
+      // After-hours surcharge if provided
+      if(afterFlag && afterH>0 && afterRate>0){ addLine(`After-hours surcharge (${afterH}h @ $${afterRate}/h)`, afterH*afterRate); }
+
+      // Décor pricing
+      if(tablesQty>0){ const p=R.decor.table[tablesSetup]||0; addLine(`Tables x ${tablesQty} (${tablesSetup})`, p*tablesQty); }
+      if(clothQty>0){ const p=R.decor.tablecloth[clothSetup]||0; addLine(`Tablecloths x ${clothQty} (${clothSetup})`, p*clothQty); }
+      if(topperQty>0){ const p=R.decor.topper[topperSetup]||0; addLine(`Toppers x ${topperQty} (${topperSetup})`, p*topperQty); }
+      if(candleQty>0){ const p=R.decor.candle[candleSetup]||0; addLine(`Candle vases x ${candleQty} (${candleSetup})`, p*candleQty); }
+      if(mirrorQty>0){ const p=R.decor.mirror[mirrorSetup]||0; addLine(`Table mirrors x ${mirrorQty} (${mirrorSetup})`, p*mirrorQty); }
+      if(chairsQty>0){ const p=R.decor.chair[chairsSetup]||0; addLine(`Banquet chairs x ${chairsQty} (${chairsSetup})`, p*chairsQty); }
+      if(buffetQty>0){ addLine(`Buffet tables x ${buffetQty}`, R.decor.buffet*buffetQty); }
+
+      // Other amenities
+      if(addMicQty>0){ addLine(`Wireless mic & stand x ${addMicQty}`, R.amenities.extraMic*addMicQty); }
+      if(podiumDisplayQty>0){ addLine(`Podium digital display x ${podiumDisplayQty}`, R.amenities.podiumDisplay*podiumDisplayQty); }
+      // Free amenities noted, but $0
+      if(stageInc){ lines.push({label:'Stage with Podium & Microphone', amt:0}); }
+      if(promoInc){ lines.push({label:'Event promotion on social', amt:0}); }
+      if(trashInc){ lines.push({label:'Oversized trash cans/bags', amt:0}); }
+
+      // Additional staff requested
+      if(addStaffQty>0 && addStaffRate>0 && hours>0){ addLine(`Additional staff (${addStaffQty} x ${hours}h @ $${addStaffRate}/h)`, addStaffQty*hours*addStaffRate); }
+
+      // Special rates
+      if(discount==='countyMeeting'){
+        // Entire booking free (if available) – reflect as a discount equal to subtotal
+        if(subtotal>0){ lines.push({label:'County Meeting (Free if available)', amt:-subtotal}); subtotal = 0; }
+      } else if(discount==='countyAgency'){
+        const d = subtotal * 0.5; if(d){ lines.push({label:'County/City Agency discount (50%)', amt:-d}); subtotal -= d; }
+      }
+
+      // Tax
+      let total = subtotal; let tax=0;
+      if(taxable){ tax = total * R.taxRate; lines.push({label:'Tax', amt:tax}); total += tax; }
+
+      // Update UI
+      $('#grandTotal').textContent = currency(total);
+      const ul=$('#lineItems'); ul.innerHTML='';
+      lines.forEach(li=>{
+        const el=document.createElement('li');
+        el.innerHTML = `<span>${li.label}</span><span>${currency(li.amt)}</span>`;
+        ul.appendChild(el);
+      });
+      $('#notes').textContent = `Estimate for ${days} day${days>1?'s':''}. On-site staff representative is required for each event. If any portion occurs outside Mon–Sat 9am–5pm, include an after-hours surcharge.`;
+    }
+
+    // Bind events
+    inputs.forEach(el=> el && el.addEventListener('input', compute));
+    document.querySelector('#venue')?.addEventListener('change', compute);
+    document.addEventListener('DOMContentLoaded', ()=>{
+      // Open details by default on wide screens for discoverability
+      if(window.matchMedia('(min-width: 1000px)').matches){
+        document.querySelectorAll('details.section').forEach(d=>{ d.open = false; });
+      }
+      wireFacilityTabs();
+      setFacility('convention');
+    });
+    $('#printBtn').addEventListener('click', ()=> window.print());
+    $('#resetBtn').addEventListener('click', ()=>{ document.getElementById('calcForm').reset(); compute(); });
+
+    compute();
+  </script>
+</body>
+</html>
